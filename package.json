@@ -1,5 +1,5 @@
 {
-  "name": "Api Gateway Simulator",
+  "name": "api-gateway-sim",
   "version": "1.0.0",
   "description": "Run API Gateway and Lambda locally",
   "main": "api-gateway-sim.js",
