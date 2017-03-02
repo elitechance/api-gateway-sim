@@ -1,0 +1,43 @@
+{
+  "name": "Api Gateway Simulator",
+  "version": "1.0.0",
+  "description": "Run API Gateway and Lambda locally",
+  "main": "api-gateway-sim.js",
+  "bin": {
+    "ags": "./api-gateway-sim.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elitechance/aws-gateway-sim.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elitechance/aws-gateway-sim/issues"
+  },
+  "homepage": "https://github.com/elitechance/aws-gateway-sim#readme",
+  "keywords": [
+    "api gateway",
+    "lambda",
+    "aws"
+  ],
+  "author": "Ethan Dave B. Gomez",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/body-parser": "0.0.34",
+    "@types/commander": "^2.3.31",
+    "@types/cors": "^2.8.0",
+    "@types/express": "^4.0.35",
+    "@types/node": "^7.0.5"
+  },
+  "dependencies": {
+    "JSONPath": "^0.11.2",
+    "body-parser": "^1.16.1",
+    "commander": "^2.9.0",
+    "cors": "^2.8.1",
+    "express": "^4.14.1",
+    "jsonpath": "^0.2.11",
+    "velocityjs": "^0.9.4"
+  }
+}
