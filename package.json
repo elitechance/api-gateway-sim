@@ -11,12 +11,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elitechance/aws-gateway-sim.git"
+    "url": "git+https://github.com/elitechance/api-gateway-sim.git"
   },
   "bugs": {
-    "url": "https://github.com/elitechance/aws-gateway-sim/issues"
+    "url": "https://github.com/elitechance/api-gateway-sim/issues"
   },
-  "homepage": "https://github.com/elitechance/aws-gateway-sim#readme",
+  "homepage": "https://github.com/elitechance/api-gateway-sim#readme",
   "keywords": [
     "api gateway",
     "lambda",
