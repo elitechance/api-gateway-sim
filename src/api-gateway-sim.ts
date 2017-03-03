@@ -13,7 +13,6 @@ import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Callback from "./lib/callback";
 import Yaml = require('js-yaml');
-import {type} from "os";
 
 class ApiGatewaySim {
     private _exports;
