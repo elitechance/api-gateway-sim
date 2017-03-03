@@ -7,6 +7,7 @@ var cors = require('cors');
 var bodyParser = require('body-parser');
 var body_template_1 = require("./lib/aws/gateway/body-template");
 var callback_1 = require("./lib/callback");
+var Yaml = require('js-yaml');
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
         this._express = express();
@@ -298,14 +299,24 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.loadApiConfig = function () {
         try {
             var configFile = this._swaggerFile;
-            var configJson = fs.readFileSync(configFile, 'utf8');
-            if (!configJson) {
+            if (configFile.match(/\.json$/)) {
+                var configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = JSON.parse(configJson);
+            }
+            else if (configFile.match(/\.yaml$/)) {
+                var configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = Yaml.safeLoad(configJson);
+            }
+            else if (configFile.match(/\.yml$/)) {
+                var configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = Yaml.safeLoad(configJson);
+            }
+            if (!this._apiConfigJson) {
                 this.errorMessage("Unable to open config file " + configFile);
             }
-            this._apiConfigJson = JSON.parse(configJson);
         }
         catch (error) {
-            this.errorMessage("Unable to open swagger file " + this._swaggerFile);
+            this.errorMessage("Unable to open swagger file " + this._swaggerFile + "\nError: " + JSON.stringify(error));
         }
     };
     return ApiGatewaySim;

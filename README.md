@@ -46,6 +46,7 @@ Features
 * Supports integration responses
 * Supports event.json, context.json, and stage-variables.json
 * Continues to monitoring changes in your lambda code.  YES! No need to restart **_ags_**
+* Support for json or yaml swagger file.
 * Monitor changes in event.json, context.json, and stage-variables.json
 * CORS - enabled by default
 

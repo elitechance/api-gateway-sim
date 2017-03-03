@@ -12,6 +12,7 @@ import Request = express.Request;
 import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Callback from "./lib/callback";
+import Yaml = require('js-yaml');
 
 class ApiGatewaySim {
     private _exports;
@@ -322,12 +323,22 @@ class ApiGatewaySim {
     private loadApiConfig() {
         try {
             let configFile = this._swaggerFile;
-            let configJson = fs.readFileSync(configFile, 'utf8');
-            if (!configJson) { this.errorMessage("Unable to open config file "+configFile); }
-            this._apiConfigJson = JSON.parse(configJson);
+            if (configFile.match(/\.json$/)) {
+                let configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = JSON.parse(configJson);
+            }
+            else if (configFile.match(/\.yaml$/)) {
+                let configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = Yaml.safeLoad(configJson);
+            }
+            else if (configFile.match(/\.yml$/)) {
+                let configJson = fs.readFileSync(configFile, 'utf8');
+                this._apiConfigJson = Yaml.safeLoad(configJson);
+            }
+            if (!this._apiConfigJson) { this.errorMessage("Unable to open config file "+configFile); }
         }
         catch (error) {
-            this.errorMessage("Unable to open swagger file "+this._swaggerFile);
+            this.errorMessage("Unable to open swagger file "+this._swaggerFile+"\nError: "+JSON.stringify(error));
         }
     }
 
