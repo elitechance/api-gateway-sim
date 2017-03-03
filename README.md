@@ -32,6 +32,7 @@ Command Line Help
   Options:
 
     -h, --help                    output usage information
+    -V, --version                 output the version number
     -s, --swagger <file>          Swagger config file
     -e, --event <file>            Default file event.json
     -c, --context <file>          Default file context.json file
