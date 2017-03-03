@@ -1,7 +1,7 @@
 {
   "name": "api-gateway-sim",
-  "version": "1.0.4",
-  "description": "Run API Gateway and Lambda locally",
+  "version": "1.0.5",
+  "description": "AWS API Gateway simulator for Node JS Lambda",
   "main": "api-gateway-sim.js",
   "bin": {
     "ags": "./api-gateway-sim.js"

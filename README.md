@@ -1,5 +1,5 @@
-# api-gateway-phi
-AWS API Gateway simulator and Lambda (Node JS)
+# api-gateway-sim
+AWS API Gateway simulator for Node JS Lambda
 
 Install
 ```bash
