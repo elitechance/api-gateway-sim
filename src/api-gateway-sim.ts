@@ -26,9 +26,10 @@ class ApiGatewaySim {
 
     constructor() {
         this.loadLocalPackageJson();
-        this.loadPackageJson();
         this.initCommander();
         this.checkParameters();
+
+        this.loadPackageJson();
         this.processErrors();
         this.initPlugins();
         this.configureRoutes();
