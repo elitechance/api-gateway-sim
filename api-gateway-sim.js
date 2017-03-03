@@ -10,16 +10,18 @@ var callback_1 = require("./lib/callback");
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
         this._express = express();
+        this.loadLocalPackageJson();
+        this.loadPackageJson();
         this.initCommander();
         this.checkParameters();
         this.processErrors();
-        this.loadPackageJson();
         this.initPlugins();
         this.configureRoutes();
         this.runServer();
     }
     ApiGatewaySim.prototype.initCommander = function () {
         commander
+            .version(this._localPackageJson.version)
             .option('-s, --swagger <file>', 'Swagger config file')
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
@@ -246,6 +248,15 @@ var ApiGatewaySim = (function () {
         try {
             var packageJson = fs.readFileSync('package.json', 'utf8');
             this._packageJson = JSON.parse(packageJson);
+        }
+        catch (error) {
+            this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
+        }
+    };
+    ApiGatewaySim.prototype.loadLocalPackageJson = function () {
+        try {
+            var packageJson = fs.readFileSync(__dirname + '/package.json', 'utf8');
+            this._localPackageJson = JSON.parse(packageJson);
         }
         catch (error) {
             this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
