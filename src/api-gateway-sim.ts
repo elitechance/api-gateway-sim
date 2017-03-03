@@ -81,20 +81,6 @@ class ApiGatewaySim {
         return query;
     }
 
-    private getProperStatus(path, method, errorMessage) {
-        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
-        let responses = this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
-        for (let response in responses) {
-            if (response != 'default') {
-                let regularExpress = new RegExp(response);
-                if (errorMessage.match(regularExpress)) {
-                    return responses[response].statusCode;
-                }
-            }
-        }
-        return 200;
-    }
-
     private getRequestTemplates(path, method) {
         if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
         return this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['requestTemplates'];
@@ -299,12 +285,6 @@ class ApiGatewaySim {
                 this.errorMessage("Unable to open "+commander['event']);
             }
             this._eventJson = {};
-        }
-    }
-
-    private setContextMethods(request:Request, response:Response) {
-        this._contextJson.fail = () => {
-            let callback = new Callback();
         }
     }
 

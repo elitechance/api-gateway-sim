@@ -59,21 +59,6 @@ var ApiGatewaySim = (function () {
         var query = url_parts.query;
         return query;
     };
-    ApiGatewaySim.prototype.getProperStatus = function (path, method, errorMessage) {
-        if (method == 'all') {
-            method = 'x-amazon-apigateway-any-method';
-        }
-        var responses = this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
-        for (var response in responses) {
-            if (response != 'default') {
-                var regularExpress = new RegExp(response);
-                if (errorMessage.match(regularExpress)) {
-                    return responses[response].statusCode;
-                }
-            }
-        }
-        return 200;
-    };
     ApiGatewaySim.prototype.getRequestTemplates = function (path, method) {
         if (method == 'all') {
             method = 'x-amazon-apigateway-any-method';
@@ -277,11 +262,6 @@ var ApiGatewaySim = (function () {
             }
             this._eventJson = {};
         }
-    };
-    ApiGatewaySim.prototype.setContextMethods = function (request, response) {
-        this._contextJson.fail = function () {
-            var callback = new callback_1.default();
-        };
     };
     ApiGatewaySim.prototype.loadContextJson = function () {
         try {
