@@ -13,6 +13,7 @@ import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Callback from "./lib/callback";
 import Yaml = require('js-yaml');
+import {type} from "os";
 
 class ApiGatewaySim {
     private _exports;
@@ -24,6 +25,7 @@ class ApiGatewaySim {
     private _apiConfigJson;
     private _express = express();
     private _swaggerFile:string;
+    private _currentResponse;
 
     constructor() {
         this.loadLocalPackageJson();
@@ -57,9 +59,11 @@ class ApiGatewaySim {
     }
 
     private processErrors() {
-        process.on('uncaughtException', function (error:Error) {
+        process.on('uncaughtException', (error:Error) => {
             if (error.message != 'LAMBDA_DONE') {
-                console.log(error);
+                console.log(error.message);
+                this._currentResponse.statusMessage = "Server Error: "+error.message;
+                this._currentResponse.status(500).end();
             }
         });
     }
@@ -143,6 +147,7 @@ class ApiGatewaySim {
                 this.loadEventJson();
                 this.loadContextJson();
                 this.loadHandler();
+                this._currentResponse = res;
                 let jsonEncodedEvent = this.parseEvent(originalPath, method, req);
                 let event = JSON.parse(jsonEncodedEvent);
                 this._eventJson = Object['assign'](this._eventJson, event);
@@ -156,7 +161,9 @@ class ApiGatewaySim {
             }
             catch (error) {
                 if (error.message != 'LAMBDA_DONE') {
-                    console.log(error);
+                    console.log(error.message);
+                    this._currentResponse.statusMessage = "Server Error: "+error.message;
+                    this._currentResponse.status(500).end();
                 }
             }
         });

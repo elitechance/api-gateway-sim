@@ -38,9 +38,12 @@ var ApiGatewaySim = (function () {
         this.loadApiConfig();
     };
     ApiGatewaySim.prototype.processErrors = function () {
+        var _this = this;
         process.on('uncaughtException', function (error) {
             if (error.message != 'LAMBDA_DONE') {
-                console.log(error);
+                console.log(error.message);
+                _this._currentResponse.statusMessage = "Server Error: " + error.message;
+                _this._currentResponse.status(500).end();
             }
         });
     };
@@ -122,6 +125,7 @@ var ApiGatewaySim = (function () {
                 _this.loadEventJson();
                 _this.loadContextJson();
                 _this.loadHandler();
+                _this._currentResponse = res;
                 var jsonEncodedEvent = _this.parseEvent(originalPath, method, req);
                 var event_1 = JSON.parse(jsonEncodedEvent);
                 _this._eventJson = Object['assign'](_this._eventJson, event_1);
@@ -134,7 +138,9 @@ var ApiGatewaySim = (function () {
             }
             catch (error) {
                 if (error.message != 'LAMBDA_DONE') {
-                    console.log(error);
+                    console.log(error.message);
+                    _this._currentResponse.statusMessage = "Server Error: " + error.message;
+                    _this._currentResponse.status(500).end();
                 }
             }
         });
