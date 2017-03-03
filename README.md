@@ -6,7 +6,11 @@ Install
 $ npm install -g api-gateway-sim
 ```
 
-To run, you need to export your configuration from AWS API Gateway.  See [Export an API from Api Gateway](http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-export-api.html)
+To run, you need to export your configuration from AWS API Gateway console.
+Choose **"Export as Swagger + API Gateway Extensions"**.
+![alt text](http://docs.aws.amazon.com/apigateway/latest/developerguide/images/export-console.png)
+
+See details in [Export an API from Api Gateway](http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-export-api.html)
 
 Running the simulator using **_ags_** cli
 ```bash
