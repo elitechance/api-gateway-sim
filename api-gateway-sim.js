@@ -6,16 +6,14 @@ var express = require('express');
 var cors = require('cors');
 var bodyParser = require('body-parser');
 var body_template_1 = require("./lib/aws/gateway/body-template");
+var callback_1 = require("./lib/callback");
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
         this._express = express();
         this.initCommander();
-        this.checkSwagger();
+        this.checkParameters();
         this.processErrors();
         this.loadPackageJson();
-        this.loadEvenJson();
-        this.loadStageVariables();
-        this.loadContextJson();
         this.initPlugins();
         this.configureRoutes();
         this.runServer();
@@ -23,13 +21,17 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.initCommander = function () {
         commander
             .option('-s, --swagger <file>', 'Swagger config file')
+            .option('-e, --event <file>', 'Default file event.json')
+            .option('-c, --context <file>', 'Default file context.json file')
+            .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
             .parse(process.argv);
     };
-    ApiGatewaySim.prototype.checkSwagger = function () {
-        if (!commander.swagger) {
-            this.errorMessage("No swagger file, please run with --swagger <swagger config file>");
+    ApiGatewaySim.prototype.checkParameters = function () {
+        if (!commander['swagger']) {
+            this.logInfo("No swagger file, please run with --swagger <swagger config file>");
+            commander.help();
         }
-        this._swaggerFile = commander.swagger;
+        this._swaggerFile = commander['swagger'];
         this.loadApiConfig();
     };
     ApiGatewaySim.prototype.processErrors = function () {
@@ -105,28 +107,41 @@ var ApiGatewaySim = (function () {
         var compiled = bodyTemplate.parse(template);
         return compiled;
     };
-    ApiGatewaySim.prototype.addRoute = function (originalPath, path, method, hasPathParams) {
+    ApiGatewaySim.prototype.getNewCallback = function (path, method, request, response) {
+        var callback = new callback_1.default();
+        callback.path = path;
+        callback.method = method;
+        callback.apiConfigJson = this._apiConfigJson;
+        callback.request = request;
+        callback.response = response;
+        return callback;
+    };
+    ApiGatewaySim.prototype.getContextMethods = function (path, method, request, response) {
+        var callback = this.getNewCallback(path, method, request, response);
+        var methods = {
+            succeed: function (result) { callback.handler(null, result); },
+            fail: function (result) { callback.handler(result); },
+            done: function () { callback.handler(null, null); }
+        };
+        return methods;
+    };
+    ApiGatewaySim.prototype.addRoute = function (originalPath, path, method) {
         var _this = this;
         this.logInfo("Add Route " + originalPath + ", method " + method.toUpperCase());
         this._express[method](path, function (req, res) {
-            _this._response = res;
-            _this._request = req;
-            var jsonEncodedEvent = _this.parseEvent(originalPath, method, req);
-            var event = JSON.parse(jsonEncodedEvent);
-            _this._eventJson = Object.assign(_this._eventJson, event);
             try {
+                _this.loadStageVariables();
+                _this.loadEventJson();
+                _this.loadContextJson();
                 _this.loadHandler();
+                var jsonEncodedEvent = _this.parseEvent(originalPath, method, req);
+                var event_1 = JSON.parse(jsonEncodedEvent);
+                _this._eventJson = Object['assign'](_this._eventJson, event_1);
+                var contextMethods = _this.getContextMethods(originalPath, method, req, res);
+                _this._contextJson = Object['assign'](contextMethods, _this._contextJson);
                 _this._exports.handler(_this._eventJson, _this._contextJson, function (error, message) {
-                    if (error) {
-                        var errorMessage = error.toString().replace(/Error: /, '');
-                        var status_1 = _this.getProperStatus(originalPath, method, errorMessage);
-                        _this._response.statusMessage = errorMessage;
-                        _this._response.status(status_1).end();
-                    }
-                    else {
-                        _this._response.send(message);
-                    }
-                    throw new Error("LAMBDA_DONE");
+                    var callback = _this.getNewCallback(originalPath, method, req, res);
+                    callback.handler(error, message);
                 });
             }
             catch (error) {
@@ -159,10 +174,10 @@ var ApiGatewaySim = (function () {
         }
         switch (method) {
             case 'x-amazon-apigateway-any-method':
-                this.addRoute(originalPath, path, 'all', hasPathParams);
+                this.addRoute(originalPath, path, 'all');
                 break;
             default:
-                this.addRoute(originalPath, path, method, hasPathParams);
+                this.addRoute(originalPath, path, method);
                 break;
         }
     };
@@ -190,11 +205,9 @@ var ApiGatewaySim = (function () {
         this.searchCache(moduleName, function (mod) {
             delete require.cache[mod.id];
         });
-        // Remove cached paths to the module.
-        // Thanks to @bentael for pointing this out.
-        Object.keys(module.constructor._pathCache).forEach(function (cacheKey) {
+        Object.keys(module.constructor['_pathCache']).forEach(function (cacheKey) {
             if (cacheKey.indexOf(moduleName) > 0) {
-                delete module.constructor._pathCache[cacheKey];
+                delete module.constructor['_pathCache'][cacheKey];
             }
         });
     };
@@ -208,7 +221,7 @@ var ApiGatewaySim = (function () {
             (function traverse(mod) {
                 // Go over each of the module's children and
                 // traverse them
-                mod.children.forEach(function (child) {
+                mod['children'].forEach(function (child) {
                     traverse(child);
                 });
                 // Call the specified callback providing the
@@ -217,10 +230,12 @@ var ApiGatewaySim = (function () {
             }(mod));
         }
     };
+    ApiGatewaySim.prototype.getModule = function () {
+        return process.cwd() + '/' + this._packageJson.main;
+    };
     ApiGatewaySim.prototype.loadHandler = function () {
-        var module = process.cwd() + '/' + this._packageJson.main;
+        var module = this.getModule();
         this.purgeCache(module);
-        //if (require.cache[require.resolve(module)] ) { delete require.cache[require.resolve(module)]; }
         this._exports = require(module);
     };
     ApiGatewaySim.prototype.errorMessage = function (message) {
@@ -236,30 +251,56 @@ var ApiGatewaySim = (function () {
             this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
         }
     };
-    ApiGatewaySim.prototype.loadEvenJson = function () {
+    ApiGatewaySim.prototype.loadEventJson = function () {
         try {
-            var eventJson = fs.readFileSync('event.json', 'utf8');
+            var file = 'event.json';
+            if (commander['event']) {
+                file = commander['event'];
+            }
+            var eventJson = fs.readFileSync(file, 'utf8');
             this._eventJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['event']) {
+                this.errorMessage("Unable to open " + commander['event']);
+            }
             this._eventJson = {};
         }
     };
+    ApiGatewaySim.prototype.setContextMethods = function (request, response) {
+        this._contextJson.fail = function () {
+            var callback = new callback_1.default();
+        };
+    };
     ApiGatewaySim.prototype.loadContextJson = function () {
         try {
-            var eventJson = fs.readFileSync('context.json', 'utf8');
+            var file = 'context.json';
+            if (commander['context']) {
+                file = commander['context'];
+            }
+            var eventJson = fs.readFileSync(file, 'utf8');
             this._contextJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['context']) {
+                this.errorMessage("Unable to open " + commander['context']);
+            }
             this._contextJson = {};
         }
     };
     ApiGatewaySim.prototype.loadStageVariables = function () {
         try {
-            var eventJson = fs.readFileSync('stage-variables.json', 'utf8');
+            var file = 'stage-variables.json';
+            if (commander['stageVariables']) {
+                file = commander['stageVariables'];
+            }
+            var eventJson = fs.readFileSync(file, 'utf8');
             this._stageVariablesJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['stageVariables']) {
+                this.errorMessage("Unable to open " + commander['stageVariables']);
+            }
             this._stageVariablesJson = {};
         }
     };

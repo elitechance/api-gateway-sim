@@ -14,7 +14,7 @@
   ],
   "files": [
     "src/api-gateway-sim.ts",
-    "src/test-velocity.ts",
+    "src/lib/callback.ts",
     "src/lib/aws/gateway/util.ts",
     "src/lib/aws/gateway/input.ts"
   ]

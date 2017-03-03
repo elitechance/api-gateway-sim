@@ -11,6 +11,7 @@ import bodyParser = require('body-parser');
 import Request = express.Request;
 import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
+import Callback from "./lib/callback";
 
 class ApiGatewaySim {
     private _exports;
@@ -20,18 +21,13 @@ class ApiGatewaySim {
     private _stageVariablesJson;
     private _apiConfigJson;
     private _express = express();
-    private _request:Request;
-    private _response:Response;
     private _swaggerFile:string;
 
     constructor() {
         this.initCommander();
-        this.checkSwagger();
+        this.checkParameters();
         this.processErrors();
         this.loadPackageJson();
-        this.loadEvenJson();
-        this.loadStageVariables();
-        this.loadContextJson();
         this.initPlugins();
         this.configureRoutes();
         this.runServer();
@@ -40,14 +36,18 @@ class ApiGatewaySim {
     private initCommander() {
         commander
             .option('-s, --swagger <file>', 'Swagger config file')
+            .option('-e, --event <file>', 'Default file event.json')
+            .option('-c, --context <file>', 'Default file context.json file')
+            .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
             .parse(process.argv);
     }
 
-    private checkSwagger() {
-        if (!commander.swagger) {
-            this.errorMessage("No swagger file, please run with --swagger <swagger config file>");
+    private checkParameters() {
+        if (!commander['swagger']) {
+            this.logInfo("No swagger file, please run with --swagger <swagger config file>");
+            commander.help();
         }
-        this._swaggerFile = commander.swagger;
+        this._swaggerFile = commander['swagger'];
         this.loadApiConfig();
     }
 
@@ -124,29 +124,43 @@ class ApiGatewaySim {
         return compiled;
     }
 
-    private addRoute(originalPath, path, method, hasPathParams?:boolean) {
+    private getNewCallback(path:string, method:string, request:Request, response:Response) {
+        let callback = new Callback();
+        callback.path = path;
+        callback.method = method;
+        callback.apiConfigJson = this._apiConfigJson;
+        callback.request = request;
+        callback.response = response;
+        return callback;
+    }
+
+    private getContextMethods(path:string, method:string, request:Request, response:Response):any {
+        let callback = this.getNewCallback(path, method, request, response);
+        let methods = {
+            succeed: function(result) { callback.handler(null, result); },
+            fail: function(result) { callback.handler(result); },
+            done: function() { callback.handler(null, null); }
+        };
+        return methods;
+    }
+
+    private addRoute(originalPath, path, method) {
         this.logInfo("Add Route "+originalPath+", method "+method.toUpperCase());
         this._express[method](path, (req, res) => {
-            this._response = res;
-            this._request = req;
-
-            let jsonEncodedEvent = this.parseEvent(originalPath, method, req);
-            let event = JSON.parse(jsonEncodedEvent);
-            this._eventJson = Object.assign(this._eventJson, event);
-
             try {
+                this.loadStageVariables();
+                this.loadEventJson();
+                this.loadContextJson();
                 this.loadHandler();
+                let jsonEncodedEvent = this.parseEvent(originalPath, method, req);
+                let event = JSON.parse(jsonEncodedEvent);
+                this._eventJson = Object['assign'](this._eventJson, event);
+                let contextMethods = this.getContextMethods(originalPath, method, req, res);
+                this._contextJson = Object['assign'](contextMethods, this._contextJson);
+
                 this._exports.handler(this._eventJson, this._contextJson, (error, message) => {
-                    if (error) {
-                        let errorMessage = error.toString().replace(/Error: /,'');
-                        let status = this.getProperStatus(originalPath, method, errorMessage);
-                        this._response.statusMessage = errorMessage;
-                        this._response.status(status).end();
-                    }
-                    else {
-                        this._response.send(message);
-                    }
-                    throw new Error("LAMBDA_DONE");
+                    let callback = this.getNewCallback(originalPath, method, req, res);
+                    callback.handler(error, message);
                 });
             }
             catch (error) {
@@ -177,8 +191,8 @@ class ApiGatewaySim {
             path = this.replacePathParams(path);
         }
         switch (method) {
-            case 'x-amazon-apigateway-any-method':this.addRoute(originalPath, path, 'all', hasPathParams); break;
-            default: this.addRoute(originalPath, path, method, hasPathParams); break;
+            case 'x-amazon-apigateway-any-method':this.addRoute(originalPath, path, 'all'); break;
+            default: this.addRoute(originalPath, path, method); break;
         }
     }
 
@@ -207,11 +221,9 @@ class ApiGatewaySim {
             delete require.cache[mod.id];
         });
 
-        // Remove cached paths to the module.
-        // Thanks to @bentael for pointing this out.
-        Object.keys(module.constructor._pathCache).forEach(function(cacheKey) {
+        Object.keys(module.constructor['_pathCache']).forEach(function(cacheKey) {
             if (cacheKey.indexOf(moduleName)>0) {
-                delete module.constructor._pathCache[cacheKey];
+                delete module.constructor['_pathCache'][cacheKey];
             }
         });
     }
@@ -227,7 +239,7 @@ class ApiGatewaySim {
             (function traverse(mod) {
                 // Go over each of the module's children and
                 // traverse them
-                mod.children.forEach(function (child) {
+                mod['children'].forEach(function (child) {
                     traverse(child);
                 });
                 // Call the specified callback providing the
@@ -237,10 +249,13 @@ class ApiGatewaySim {
         }
     }
 
+    private getModule() {
+        return process.cwd()+'/'+this._packageJson.main;
+    }
+
     private loadHandler() {
-        let module = process.cwd()+'/'+this._packageJson.main;
+        let module = this.getModule();
         this.purgeCache(module);
-        //if (require.cache[require.resolve(module)] ) { delete require.cache[require.resolve(module)]; }
         this._exports = require(module);
     }
 
@@ -259,32 +274,53 @@ class ApiGatewaySim {
         }
     }
 
-    private loadEvenJson() {
+    private loadEventJson() {
         try {
-            let eventJson = fs.readFileSync('event.json', 'utf8');
+            let file = 'event.json';
+            if (commander['event']) { file = commander['event']; }
+            let eventJson = fs.readFileSync(file, 'utf8');
             this._eventJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['event']) {
+                this.errorMessage("Unable to open "+commander['event']);
+            }
             this._eventJson = {};
+        }
+    }
+
+    private setContextMethods(request:Request, response:Response) {
+        this._contextJson.fail = () => {
+            let callback = new Callback();
         }
     }
 
     private loadContextJson() {
         try {
-            let eventJson = fs.readFileSync('context.json', 'utf8');
+            let file = 'context.json';
+            if (commander['context']) { file = commander['context']; }
+            let eventJson = fs.readFileSync(file, 'utf8');
             this._contextJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['context']) {
+                this.errorMessage("Unable to open "+commander['context']);
+            }
             this._contextJson = {};
         }
     }
 
     private loadStageVariables() {
         try {
-            let eventJson = fs.readFileSync('stage-variables.json', 'utf8');
+            let file = 'stage-variables.json';
+            if (commander['stageVariables']) { file = commander['stageVariables']; }
+            let eventJson = fs.readFileSync(file, 'utf8');
             this._stageVariablesJson = JSON.parse(eventJson);
         }
         catch (error) {
+            if (commander['stageVariables']) {
+                this.errorMessage("Unable to open "+commander['stageVariables']);
+            }
             this._stageVariablesJson = {};
         }
     }
