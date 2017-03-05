@@ -37,6 +37,7 @@ Command Line Help
 
     -h, --help                    output usage information
     -V, --version                 output the version number
+    -i, --timeout <lambda timeout>  Default is 3 seconds
     -s, --swagger <file>          Swagger config file
     -e, --event <file>            Default file event.json
     -c, --context <file>          Default file context.json file
@@ -57,3 +58,4 @@ Features
 @TODOS
 ------
 * Set proper CORS configuration define in swagger file
+* End lambda function after the given timeout
