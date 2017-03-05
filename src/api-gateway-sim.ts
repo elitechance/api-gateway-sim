@@ -41,6 +41,7 @@ class ApiGatewaySim {
     private initCommander() {
         commander
             .version(this._localPackageJson.version)
+            .option('-i, --timeout <lambda timeout>', 'Default is 3 seconds')
             .option('-s, --swagger <file>', 'Swagger config file')
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
@@ -120,6 +121,10 @@ class ApiGatewaySim {
 
     private getNewCallback(path:string, method:string, request:Request, response:Response) {
         let callback = new Callback();
+        let lambdaTimeout = commander['timeout'];
+        if (lambdaTimeout) {
+            callback.timeout = lambdaTimeout;
+        }
         callback.path = path;
         callback.method = method;
         callback.apiConfigJson = this._apiConfigJson;
@@ -133,7 +138,8 @@ class ApiGatewaySim {
         let methods = {
             succeed: function(result) { callback.handler(null, result); },
             fail: function(result) { callback.handler(result); },
-            done: function() { callback.handler(null, null); }
+            done: function() { callback.handler(null, null); },
+            getRemainingTimeInMillis: function () { return callback.getRemainingTimeInMillis(); }
         };
         return methods;
     }

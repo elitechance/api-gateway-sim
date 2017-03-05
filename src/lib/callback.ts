@@ -11,6 +11,8 @@ export default class Callback {
     private _request:Request;
     private _response:Response;
     private _apiConfigJson;
+    private _timeout = 3000; // Default 3000 miliseconds timeout
+    private _startTime = new Date();
 
     get request(): Request {
         return this._request;
@@ -74,6 +76,24 @@ export default class Callback {
 
     set method(value) {
         this._method = value;
+    }
+
+    get timeout(): number {
+        return this._timeout;
+    }
+
+    set timeout(value: number) {
+        // Convert to miliseconds
+        this._timeout =  value * 1000;
+    }
+
+    /**
+     * Thanks to https://github.com/motdotla/node-lambda for the implementation
+     * @returns {number}
+     */
+    getRemainingTimeInMillis() {
+        let currentTime = new Date();
+        return this.timeout - (currentTime - this._startTime);
     }
 
     handler(error, message?:any) {
