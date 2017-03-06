@@ -1,4 +1,4 @@
-#!/usr/bin/env node --harmony
+#!/usr/bin/env node
 /**
  * Created by Ethan Dave B. Gomez on 2/24/17.
  */

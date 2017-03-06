@@ -1,4 +1,4 @@
-#!/usr/bin/env node --harmony
+#!/usr/bin/env node
 "use strict";
 var fs = require('fs');
 var commander = require('commander');
