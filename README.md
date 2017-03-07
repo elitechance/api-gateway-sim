@@ -54,8 +54,8 @@ Features
 * Support for json or yaml swagger file.
 * Monitor changes in event.json, context.json, and stage-variables.json
 * CORS - enabled by default
+* Supports lambda timeout
 
 @TODOS
 ------
 * Set proper CORS configuration define in swagger file
-* End lambda function after the given timeout
