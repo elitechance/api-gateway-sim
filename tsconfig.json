@@ -15,6 +15,7 @@
   "files": [
     "src/api-gateway-sim.ts",
     "src/lib/callback.ts",
+    "src/lib/handler.ts",
     "src/lib/aws/gateway/util.ts",
     "src/lib/aws/gateway/input.ts"
   ]

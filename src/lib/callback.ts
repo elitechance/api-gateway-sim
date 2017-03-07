@@ -6,77 +6,9 @@ import Request = express.Request;
 import Response = express.Response;
 
 export default class Callback {
-    private _path;
-    private _method;
-    private _request:Request;
-    private _response:Response;
-    private _apiConfigJson;
     private _timeout = 3000; // Default 3000 miliseconds timeout
     private _startTime = new Date();
-
-    get request(): Request {
-        return this._request;
-    }
-
-    set request(value: Request) {
-        this._request = value;
-    }
-
-    get response(): Response {
-        return this._response;
-    }
-
-    set response(value: Response) {
-        this._response = value;
-    }
-
-    get apiConfigJson() {
-        return this._apiConfigJson;
-    }
-
-    set apiConfigJson(value) {
-        this._apiConfigJson = value;
-    }
-
-    private getRequestTemplates(path, method) {
-        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
-        return this.apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['requestTemplates'];
-    }
-
-    private getRequestTemplate(path, method, contentType) {
-        let templates = this.getRequestTemplates(path, method);
-        return templates[contentType];
-    }
-
-    private getProperStatus(path, method, errorMessage) {
-        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
-        let responses = this.apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
-        for (let response in responses) {
-            if (response != 'default') {
-                let regularExpress = new RegExp(response);
-                if (errorMessage.match(regularExpress)) {
-                    return responses[response].statusCode;
-                }
-            }
-        }
-        return 200;
-    }
-
-    get path() {
-        return this._path;
-    }
-
-    set path(value) {
-        this._path = value;
-    }
-
-    get method() {
-        return this._method;
-    }
-
-    set method(value) {
-        this._method = value;
-    }
+    private _process;
 
     get timeout(): number {
         return this._timeout;
@@ -96,17 +28,36 @@ export default class Callback {
         return this.timeout - (currentTime - this._startTime);
     }
 
-    handler(error, message?:any) {
+    private getResponse(error:Error, message) {
+        let errorResponse;
         if (error) {
-            let errorMessage = error.toString().replace(/Error: /,'');
-            let status = this.getProperStatus(this.path, this.method, errorMessage);
-            this.response.statusMessage = errorMessage;
-            this.response.status(status).end();
+            errorResponse = {
+                message:error.message,
+                name:error.name,
+                stack:error.stack
+            }
         }
         else {
-            this.response.send(message);
+            errorResponse = null;
         }
-        throw new Error("LAMBDA_DONE");
+        return {
+            timeout:false,
+            error:errorResponse,
+            message:message
+        }
     }
 
+    handler(error:Error, message?:any) {
+        let response = this.getResponse(error, message);
+        this.process.send(response);
+        this.process.exit(0);
+    }
+
+    get process() {
+        return this._process;
+    }
+
+    set process(value) {
+        this._process = value;
+    }
 }

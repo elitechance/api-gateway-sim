@@ -5,22 +5,17 @@
 
 import fs = require('fs');
 import commander = require('commander');
-import express = require('express');
 import cors = require('cors');
 import bodyParser = require('body-parser');
+import express = require('express');
 import Request = express.Request;
 import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
-import Callback from "./lib/callback";
 import Yaml = require('js-yaml');
 
 class ApiGatewaySim {
-    private _exports;
     private _packageJson;
     private _localPackageJson;
-    private _eventJson;
-    private _contextJson;
-    private _stageVariablesJson;
     private _apiConfigJson;
     private _express = express();
     private _swaggerFile:string;
@@ -60,11 +55,7 @@ class ApiGatewaySim {
 
     private processErrors() {
         process.on('uncaughtException', (error:Error) => {
-            if (error.message != 'LAMBDA_DONE') {
-                console.log(error.message);
-                this._currentResponse.statusMessage = "Server Error: "+error.message;
-                this._currentResponse.status(500).end();
-            }
+            this.sendErrorResponse(error);
         });
     }
 
@@ -99,7 +90,7 @@ class ApiGatewaySim {
 
     private parseEvent(path:string, method:string, request:Request) {
         let bodyTemplate = new BodyTemplate();
-        bodyTemplate.context = this._contextJson;
+        bodyTemplate.context = this.getContextJson();
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -110,7 +101,7 @@ class ApiGatewaySim {
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
         bodyTemplate.payload = JSON.stringify(request.body);
-        bodyTemplate.stageVariables = this._stageVariablesJson;
+        bodyTemplate.stageVariables = this.getStageVariables();
         let contextType = request.headers['content-type'];
         if (!contextType) { contextType = 'application/json'; }
         let template = this.getRequestTemplate(path, method, contextType);
@@ -119,57 +110,82 @@ class ApiGatewaySim {
         return compiled;
     }
 
-    private getNewCallback(path:string, method:string, request:Request, response:Response) {
-        let callback = new Callback();
-        let lambdaTimeout = commander['timeout'];
-        if (lambdaTimeout) {
-            callback.timeout = lambdaTimeout;
+    private getLambdaTimeout() {
+        let timeout = commander['timeout'];
+        if (timeout) {
+            return timeout;
         }
-        callback.path = path;
-        callback.method = method;
-        callback.apiConfigJson = this._apiConfigJson;
-        callback.request = request;
-        callback.response = response;
-        return callback;
+        return 3; // default;
     }
 
-    private getContextMethods(path:string, method:string, request:Request, response:Response):any {
-        let callback = this.getNewCallback(path, method, request, response);
-        let methods = {
-            succeed: function(result) { callback.handler(null, result); },
-            fail: function(result) { callback.handler(result); },
-            done: function() { callback.handler(null, null); },
-            getRemainingTimeInMillis: function () { return callback.getRemainingTimeInMillis(); }
+    private getProperStatus(path, method, errorMessage) {
+        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
+        let responses = this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
+        for (let response in responses) {
+            if (response != 'default') {
+                let regularExpress = new RegExp(response);
+                if (errorMessage.match(regularExpress)) {
+                    return responses[response].statusCode;
+                }
+            }
+        }
+        return 200;
+    }
+
+    private sendErrorResponse(error:Error) {
+        if (error.message != 'LAMBDA_DONE') {
+            console.log(error.message);
+            this._currentResponse.statusMessage = "Server Error: "+error.message;
+            this._currentResponse.status(500).end();
+        }
+    }
+
+    private getRequest(originalPath:string, method:string, request:Request) {
+        let jsonEncodedEvent = this.parseEvent(originalPath, method, request);
+        let event = JSON.parse(jsonEncodedEvent);
+        let eventJson = Object['assign'](this.getEventJson(), event);
+        return {
+            eventJson:eventJson,
+            packageJson:this._packageJson,
+            contextJson:this.getContextJson(),
+            stageVariables:this.getStageVariables(),
+            lambdaTimeout:this.getLambdaTimeout()
         };
-        return methods;
+    }
+
+    private processHandlerResponse(originalPath:string, method:string, httpResponse:Response, lambdaResponse) {
+        if (lambdaResponse.lambdaError) {
+            httpResponse.send({errorMessage:lambdaResponse.error});
+        }
+        else if (lambdaResponse.timeout) {
+            httpResponse.send({errorMessage:"Task timed out after "+this.getLambdaTimeout()+".00 seconds"});
+        }
+        else if (lambdaResponse.error) {
+            let error = lambdaResponse.error;
+            let status = this.getProperStatus(originalPath, method, error.message);
+            httpResponse.statusMessage = error.message;
+            httpResponse.status(status).end();
+        }
+        else {
+            httpResponse.send(lambdaResponse.message);
+        }
     }
 
     private addRoute(originalPath, path, method) {
         this.logInfo("Add Route "+originalPath+", method "+method.toUpperCase());
         this._express[method](path, (req, res) => {
             try {
-                this.loadStageVariables();
-                this.loadEventJson();
-                this.loadContextJson();
-                this.loadHandler();
                 this._currentResponse = res;
-                let jsonEncodedEvent = this.parseEvent(originalPath, method, req);
-                let event = JSON.parse(jsonEncodedEvent);
-                this._eventJson = Object['assign'](this._eventJson, event);
-                let contextMethods = this.getContextMethods(originalPath, method, req, res);
-                this._contextJson = Object['assign'](contextMethods, this._contextJson);
-
-                this._exports.handler(this._eventJson, this._contextJson, (error, message) => {
-                    let callback = this.getNewCallback(originalPath, method, req, res);
-                    callback.handler(error, message);
+                let process = require('child_process');
+                let parent = process.fork(__dirname+'/lib/handler');
+                parent.on('message', (message) =>{
+                    this.processHandlerResponse(originalPath, method, res, message);
                 });
+                let request = this.getRequest(originalPath, method, req);
+                parent.send(request);
             }
             catch (error) {
-                if (error.message != 'LAMBDA_DONE') {
-                    console.log(error.message);
-                    this._currentResponse.statusMessage = "Server Error: "+error.message;
-                    this._currentResponse.status(500).end();
-                }
+                this.sendErrorResponse(error);
             }
         });
     }
@@ -219,49 +235,6 @@ class ApiGatewaySim {
         });
     }
 
-    private purgeCache(moduleName:string) {
-        this.searchCache(moduleName, function (mod) {
-            delete require.cache[mod.id];
-        });
-
-        Object.keys(module.constructor['_pathCache']).forEach(function(cacheKey) {
-            if (cacheKey.indexOf(moduleName)>0) {
-                delete module.constructor['_pathCache'][cacheKey];
-            }
-        });
-    }
-
-    private searchCache(moduleName, callback:Function) {
-        // Resolve the module identified by the specified name
-        let mod = require.resolve(moduleName);
-
-        // Check if the module has been resolved and found within
-        // the cache
-        if (mod && ((mod = require.cache[mod]) !== undefined)) {
-            // Recursively go over the results
-            (function traverse(mod) {
-                // Go over each of the module's children and
-                // traverse them
-                mod['children'].forEach(function (child) {
-                    traverse(child);
-                });
-                // Call the specified callback providing the
-                // found cached module
-                callback(mod);
-            }(mod));
-        }
-    }
-
-    private getModule() {
-        return process.cwd()+'/'+this._packageJson.main;
-    }
-
-    private loadHandler() {
-        let module = this.getModule();
-        this.purgeCache(module);
-        this._exports = require(module);
-    }
-
     private errorMessage(message:string) {
         console.log(message);
         process.exit(1);
@@ -287,48 +260,48 @@ class ApiGatewaySim {
         }
     }
 
-    private loadEventJson() {
+    private getEventJson() {
         try {
             let file = 'event.json';
             if (commander['event']) { file = commander['event']; }
             let eventJson = fs.readFileSync(file, 'utf8');
-            this._eventJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['event']) {
                 this.errorMessage("Unable to open "+commander['event']);
             }
-            this._eventJson = {};
+            return {};
         }
     }
 
-    private loadContextJson() {
+    private getContextJson() {
         try {
             let file = 'context.json';
             if (commander['context']) { file = commander['context']; }
             let eventJson = fs.readFileSync(file, 'utf8');
-            this._contextJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['context']) {
                 this.errorMessage("Unable to open "+commander['context']);
             }
-            this._contextJson = {};
+            return {};
         }
     }
 
-    private loadStageVariables() {
+    private getStageVariables() {
         try {
             let file = 'stage-variables.json';
             if (commander['stageVariables']) { file = commander['stageVariables']; }
             let eventJson = fs.readFileSync(file, 'utf8');
-            this._stageVariablesJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['stageVariables']) {
                 this.errorMessage("Unable to open "+commander['stageVariables']);
             }
-            this._stageVariablesJson = {};
+            return {};
         }
     }
 

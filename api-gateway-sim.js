@@ -2,11 +2,10 @@
 "use strict";
 var fs = require('fs');
 var commander = require('commander');
-var express = require('express');
 var cors = require('cors');
 var bodyParser = require('body-parser');
+var express = require('express');
 var body_template_1 = require("./lib/aws/gateway/body-template");
-var callback_1 = require("./lib/callback");
 var Yaml = require('js-yaml');
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
@@ -41,11 +40,7 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.processErrors = function () {
         var _this = this;
         process.on('uncaughtException', function (error) {
-            if (error.message != 'LAMBDA_DONE') {
-                console.log(error.message);
-                _this._currentResponse.statusMessage = "Server Error: " + error.message;
-                _this._currentResponse.status(500).end();
-            }
+            _this.sendErrorResponse(error);
         });
     };
     ApiGatewaySim.prototype.initPlugins = function () {
@@ -76,7 +71,7 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.parseEvent = function (path, method, request) {
         var bodyTemplate = new body_template_1.default();
-        bodyTemplate.context = this._contextJson;
+        bodyTemplate.context = this.getContextJson();
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -87,7 +82,7 @@ var ApiGatewaySim = (function () {
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
         bodyTemplate.payload = JSON.stringify(request.body);
-        bodyTemplate.stageVariables = this._stageVariablesJson;
+        bodyTemplate.stageVariables = this.getStageVariables();
         var contextType = request.headers['content-type'];
         if (!contextType) {
             contextType = 'application/json';
@@ -99,55 +94,80 @@ var ApiGatewaySim = (function () {
         var compiled = bodyTemplate.parse(template);
         return compiled;
     };
-    ApiGatewaySim.prototype.getNewCallback = function (path, method, request, response) {
-        var callback = new callback_1.default();
-        var lambdaTimeout = commander['timeout'];
-        if (lambdaTimeout) {
-            callback.timeout = lambdaTimeout;
+    ApiGatewaySim.prototype.getLambdaTimeout = function () {
+        var timeout = commander['timeout'];
+        if (timeout) {
+            return timeout;
         }
-        callback.path = path;
-        callback.method = method;
-        callback.apiConfigJson = this._apiConfigJson;
-        callback.request = request;
-        callback.response = response;
-        return callback;
+        return 3; // default;
     };
-    ApiGatewaySim.prototype.getContextMethods = function (path, method, request, response) {
-        var callback = this.getNewCallback(path, method, request, response);
-        var methods = {
-            succeed: function (result) { callback.handler(null, result); },
-            fail: function (result) { callback.handler(result); },
-            done: function () { callback.handler(null, null); },
-            getRemainingTimeInMillis: function () { return callback.getRemainingTimeInMillis(); }
+    ApiGatewaySim.prototype.getProperStatus = function (path, method, errorMessage) {
+        if (method == 'all') {
+            method = 'x-amazon-apigateway-any-method';
+        }
+        var responses = this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
+        for (var response in responses) {
+            if (response != 'default') {
+                var regularExpress = new RegExp(response);
+                if (errorMessage.match(regularExpress)) {
+                    return responses[response].statusCode;
+                }
+            }
+        }
+        return 200;
+    };
+    ApiGatewaySim.prototype.sendErrorResponse = function (error) {
+        if (error.message != 'LAMBDA_DONE') {
+            console.log(error.message);
+            this._currentResponse.statusMessage = "Server Error: " + error.message;
+            this._currentResponse.status(500).end();
+        }
+    };
+    ApiGatewaySim.prototype.getRequest = function (originalPath, method, request) {
+        var jsonEncodedEvent = this.parseEvent(originalPath, method, request);
+        var event = JSON.parse(jsonEncodedEvent);
+        var eventJson = Object['assign'](this.getEventJson(), event);
+        return {
+            eventJson: eventJson,
+            packageJson: this._packageJson,
+            contextJson: this.getContextJson(),
+            stageVariables: this.getStageVariables(),
+            lambdaTimeout: this.getLambdaTimeout()
         };
-        return methods;
+    };
+    ApiGatewaySim.prototype.processHandlerResponse = function (originalPath, method, httpResponse, lambdaResponse) {
+        if (lambdaResponse.lambdaError) {
+            httpResponse.send({ errorMessage: lambdaResponse.error });
+        }
+        else if (lambdaResponse.timeout) {
+            httpResponse.send({ errorMessage: "Task timed out after " + this.getLambdaTimeout() + ".00 seconds" });
+        }
+        else if (lambdaResponse.error) {
+            var error = lambdaResponse.error;
+            var status_1 = this.getProperStatus(originalPath, method, error.message);
+            httpResponse.statusMessage = error.message;
+            httpResponse.status(status_1).end();
+        }
+        else {
+            httpResponse.send(lambdaResponse.message);
+        }
     };
     ApiGatewaySim.prototype.addRoute = function (originalPath, path, method) {
         var _this = this;
         this.logInfo("Add Route " + originalPath + ", method " + method.toUpperCase());
         this._express[method](path, function (req, res) {
             try {
-                _this.loadStageVariables();
-                _this.loadEventJson();
-                _this.loadContextJson();
-                _this.loadHandler();
                 _this._currentResponse = res;
-                var jsonEncodedEvent = _this.parseEvent(originalPath, method, req);
-                var event_1 = JSON.parse(jsonEncodedEvent);
-                _this._eventJson = Object['assign'](_this._eventJson, event_1);
-                var contextMethods = _this.getContextMethods(originalPath, method, req, res);
-                _this._contextJson = Object['assign'](contextMethods, _this._contextJson);
-                _this._exports.handler(_this._eventJson, _this._contextJson, function (error, message) {
-                    var callback = _this.getNewCallback(originalPath, method, req, res);
-                    callback.handler(error, message);
+                var process_1 = require('child_process');
+                var parent_1 = process_1.fork(__dirname + '/lib/handler');
+                parent_1.on('message', function (message) {
+                    _this.processHandlerResponse(originalPath, method, res, message);
                 });
+                var request = _this.getRequest(originalPath, method, req);
+                parent_1.send(request);
             }
             catch (error) {
-                if (error.message != 'LAMBDA_DONE') {
-                    console.log(error.message);
-                    _this._currentResponse.statusMessage = "Server Error: " + error.message;
-                    _this._currentResponse.status(500).end();
-                }
+                _this.sendErrorResponse(error);
             }
         });
     };
@@ -201,43 +221,6 @@ var ApiGatewaySim = (function () {
             _this.logInfo("Listening to port " + port);
         });
     };
-    ApiGatewaySim.prototype.purgeCache = function (moduleName) {
-        this.searchCache(moduleName, function (mod) {
-            delete require.cache[mod.id];
-        });
-        Object.keys(module.constructor['_pathCache']).forEach(function (cacheKey) {
-            if (cacheKey.indexOf(moduleName) > 0) {
-                delete module.constructor['_pathCache'][cacheKey];
-            }
-        });
-    };
-    ApiGatewaySim.prototype.searchCache = function (moduleName, callback) {
-        // Resolve the module identified by the specified name
-        var mod = require.resolve(moduleName);
-        // Check if the module has been resolved and found within
-        // the cache
-        if (mod && ((mod = require.cache[mod]) !== undefined)) {
-            // Recursively go over the results
-            (function traverse(mod) {
-                // Go over each of the module's children and
-                // traverse them
-                mod['children'].forEach(function (child) {
-                    traverse(child);
-                });
-                // Call the specified callback providing the
-                // found cached module
-                callback(mod);
-            }(mod));
-        }
-    };
-    ApiGatewaySim.prototype.getModule = function () {
-        return process.cwd() + '/' + this._packageJson.main;
-    };
-    ApiGatewaySim.prototype.loadHandler = function () {
-        var module = this.getModule();
-        this.purgeCache(module);
-        this._exports = require(module);
-    };
     ApiGatewaySim.prototype.errorMessage = function (message) {
         console.log(message);
         process.exit(1);
@@ -260,52 +243,52 @@ var ApiGatewaySim = (function () {
             this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
         }
     };
-    ApiGatewaySim.prototype.loadEventJson = function () {
+    ApiGatewaySim.prototype.getEventJson = function () {
         try {
             var file = 'event.json';
             if (commander['event']) {
                 file = commander['event'];
             }
             var eventJson = fs.readFileSync(file, 'utf8');
-            this._eventJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['event']) {
                 this.errorMessage("Unable to open " + commander['event']);
             }
-            this._eventJson = {};
+            return {};
         }
     };
-    ApiGatewaySim.prototype.loadContextJson = function () {
+    ApiGatewaySim.prototype.getContextJson = function () {
         try {
             var file = 'context.json';
             if (commander['context']) {
                 file = commander['context'];
             }
             var eventJson = fs.readFileSync(file, 'utf8');
-            this._contextJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['context']) {
                 this.errorMessage("Unable to open " + commander['context']);
             }
-            this._contextJson = {};
+            return {};
         }
     };
-    ApiGatewaySim.prototype.loadStageVariables = function () {
+    ApiGatewaySim.prototype.getStageVariables = function () {
         try {
             var file = 'stage-variables.json';
             if (commander['stageVariables']) {
                 file = commander['stageVariables'];
             }
             var eventJson = fs.readFileSync(file, 'utf8');
-            this._stageVariablesJson = JSON.parse(eventJson);
+            return JSON.parse(eventJson);
         }
         catch (error) {
             if (commander['stageVariables']) {
                 this.errorMessage("Unable to open " + commander['stageVariables']);
             }
-            this._stageVariablesJson = {};
+            return {};
         }
     };
     ApiGatewaySim.prototype.loadApiConfig = function () {
