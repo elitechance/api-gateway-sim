@@ -88,10 +88,8 @@ export class Handler {
     private getLambdaTimeout() {
         let timeout = this.request.lambdaTimeout;
         if (timeout > 300) {
-            console.log("timeout", 300);
             return 300; // Max timeout is 5 minutes in lambda
         }
-        console.log("timeout", timeout);
         return timeout;
     }
 
