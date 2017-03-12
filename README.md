@@ -55,7 +55,7 @@ Features
 ```bash
 $ ags -a
 
-# From you browser open http://localhost:4000
+# From your browser open http://localhost:4000
 ```
 * Supports integration responses
 * Supports event.json, context.json, and stage-variables.json
