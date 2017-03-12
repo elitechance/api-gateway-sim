@@ -8,7 +8,7 @@
 
 export default class Util {
     escapeJavaScriptTable = {
-        '"': '\"',    // 2.a
+        '"': '\\"',    // 2.a
         '\\': '\\\\',
         '\b': '\\b',  // 2.b (skip abbrev)
         '\f': '\\f',

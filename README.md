@@ -35,19 +35,28 @@ Command Line Help
 
   Options:
 
-    -h, --help                    output usage information
-    -V, --version                 output the version number
+    -h, --help                      output usage information
+    -V, --version                   output the version number
     -i, --timeout <lambda timeout>  Default is 3 seconds
-    -s, --swagger <file>          Swagger config file
-    -e, --event <file>            Default file event.json
-    -c, --context <file>          Default file context.json file
-    -t, --stage-variables <file>  Default file stage-variables.json file
+    -s, --swagger <file>            Swagger config file
+    -e, --event <file>              Default file event.json
+    -c, --context <file>            Default file context.json file
+    -t, --stage-variables <file>    Default file stage-variables.json file
+    -p, --port <port>               Api gateway port, default 3000
+    -a, --ags-server                Run AGS UI
+    -g, --ags-port <port>           AGS UI port, default 4000
 ```
 
 Features
 ---------
 
 * Supports Body Mapping Templates
+* Supports Body Mapping Template validation.
+```bash
+$ ags -a
+
+# From you browser open http://localhost:4000
+```
 * Supports integration responses
 * Supports event.json, context.json, and stage-variables.json
 * Continues to monitoring changes in your lambda code.  YES! No need to restart **_ags_**
@@ -56,6 +65,3 @@ Features
 * CORS - enabled by default
 * Supports lambda timeout
 
-@TODOS
-------
-* Set proper CORS configuration define in swagger file

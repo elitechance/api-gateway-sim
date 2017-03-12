@@ -17,7 +17,8 @@ class ApiGatewaySim {
     private _packageJson;
     private _localPackageJson;
     private _apiConfigJson;
-    private _express = express();
+    private _gatewayServer = express();
+    private _bodyTemplateServer = express();
     private _swaggerFile:string;
     private _currentResponse;
 
@@ -25,12 +26,6 @@ class ApiGatewaySim {
         this.loadLocalPackageJson();
         this.initCommander();
         this.checkParameters();
-
-        this.loadPackageJson();
-        this.processErrors();
-        this.initPlugins();
-        this.configureRoutes();
-        this.runServer();
     }
 
     private initCommander() {
@@ -41,16 +36,63 @@ class ApiGatewaySim {
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
+            .option('-p, --port <port>', 'Api gateway port, default is 3000')
+            .option('-a, --ags-server', 'Run AGS UI')
+            .option('-g, --ags-port <port>', 'AGS UI port, default is 4000')
             .parse(process.argv);
     }
 
-    private checkParameters() {
-        if (!commander['swagger']) {
-            this.logInfo("No swagger file, please run with --swagger <swagger config file>");
-            commander.help();
+    private onParseRequest(request:Request, response:Response) {
+        if (!request.body || !request.body.template) {
+            response.send(null);
+            return;
         }
+
+        let bodyTemplate = new BodyTemplate;
+        bodyTemplate.queryParams = request.body.queryParams;
+        bodyTemplate.pathParams = request.body.pathParams;
+        bodyTemplate.context = request.body.context;
+        if (bodyTemplate.context) {
+            bodyTemplate.method = bodyTemplate.context.httpMethod;
+        }
+        bodyTemplate.headers = request.body.headers;
+        bodyTemplate.stageVariables = request.body.stageVariables;
+        bodyTemplate.payload = JSON.stringify(request.body.body);
+        let output = bodyTemplate.parse(request.body.template);
+        response.send(output);
+    }
+
+    private runBodyMappingTemplateParser() {
+        let port = process.env['AGS_PORT'];
+        if (!port) { port = commander['agsPort']; }
+        if (!port) { port = 4000; }
+        this._bodyTemplateServer.use(express.static(__dirname+'/public'));
+        this.logInfo("Running body template parser in port "+port);
+        this._bodyTemplateServer.listen(port);
+        this._bodyTemplateServer.use(bodyParser.json());
+        this._bodyTemplateServer.post('/parse', this.onParseRequest);
+    }
+
+    private checkParameters() {
+        let agsServer = commander['agsServer'];
+        if (!agsServer && !commander['swagger']) {
+            commander.help();
+            process.exit(0);
+        }
+
+        if (agsServer) {
+            this.runBodyMappingTemplateParser();
+        }
+
         this._swaggerFile = commander['swagger'];
-        this.loadApiConfig();
+        if (this._swaggerFile) {
+            this.loadApiConfig();
+            this.loadPackageJson();
+            this.processErrors();
+            this.initPlugins();
+            this.configureRoutes();
+            this.runServer();
+        }
     }
 
     private processErrors() {
@@ -60,11 +102,11 @@ class ApiGatewaySim {
     }
 
     private initPlugins() {
-        this._express.use(cors());
+        this._gatewayServer.use(cors());
         // parse application/x-www-form-urlencoded
-        this._express.use(bodyParser.urlencoded({ extended: false }));
+        this._gatewayServer.use(bodyParser.urlencoded({ extended: false }));
         // parse application/json
-        this._express.use(bodyParser.json())
+        this._gatewayServer.use(bodyParser.json())
     }
 
     private logInfo(message) {
@@ -173,7 +215,7 @@ class ApiGatewaySim {
 
     private addRoute(originalPath, path, method) {
         this.logInfo("Add Route "+originalPath+", method "+method.toUpperCase());
-        this._express[method](path, (req, res) => {
+        this._gatewayServer[method](path, (req, res) => {
             try {
                 this._currentResponse = res;
                 let process = require('child_process');
@@ -228,8 +270,10 @@ class ApiGatewaySim {
     }
 
     private runServer() {
-        let port = process.env['PORT'] || 3000;
-        this._express.listen(port, (error, result) => {
+        let port = process.env['PORT'];
+        if (!port) { port = commander['port']; }
+        if (!port) { port = 3000; }
+        this._gatewayServer.listen(port, (error, result) => {
             if (error) { this.errorMessage(error); }
             this.logInfo("Listening to port "+ port);
         });

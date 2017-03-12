@@ -9,15 +9,11 @@ var body_template_1 = require("./lib/aws/gateway/body-template");
 var Yaml = require('js-yaml');
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
-        this._express = express();
+        this._gatewayServer = express();
+        this._bodyTemplateServer = express();
         this.loadLocalPackageJson();
         this.initCommander();
         this.checkParameters();
-        this.loadPackageJson();
-        this.processErrors();
-        this.initPlugins();
-        this.configureRoutes();
-        this.runServer();
     }
     ApiGatewaySim.prototype.initCommander = function () {
         commander
@@ -27,15 +23,61 @@ var ApiGatewaySim = (function () {
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
+            .option('-p, --port <port>', 'Api gateway port, default is 3000')
+            .option('-a, --ags-server', 'Run AGS UI')
+            .option('-g, --ags-port <port>', 'AGS UI port, default is 4000')
             .parse(process.argv);
     };
+    ApiGatewaySim.prototype.onParseRequest = function (request, response) {
+        if (!request.body || !request.body.template) {
+            response.send(null);
+            return;
+        }
+        var bodyTemplate = new body_template_1.default;
+        bodyTemplate.queryParams = request.body.queryParams;
+        bodyTemplate.pathParams = request.body.pathParams;
+        bodyTemplate.context = request.body.context;
+        if (bodyTemplate.context) {
+            bodyTemplate.method = bodyTemplate.context.httpMethod;
+        }
+        bodyTemplate.headers = request.body.headers;
+        bodyTemplate.stageVariables = request.body.stageVariables;
+        bodyTemplate.payload = JSON.stringify(request.body.body);
+        var output = bodyTemplate.parse(request.body.template);
+        response.send(output);
+    };
+    ApiGatewaySim.prototype.runBodyMappingTemplateParser = function () {
+        var port = process.env['AGS_PORT'];
+        if (!port) {
+            port = commander['agsPort'];
+        }
+        if (!port) {
+            port = 4000;
+        }
+        this._bodyTemplateServer.use(express.static(__dirname + '/public'));
+        this.logInfo("Running body template parser in port " + port);
+        this._bodyTemplateServer.listen(port);
+        this._bodyTemplateServer.use(bodyParser.json());
+        this._bodyTemplateServer.post('/parse', this.onParseRequest);
+    };
     ApiGatewaySim.prototype.checkParameters = function () {
-        if (!commander['swagger']) {
-            this.logInfo("No swagger file, please run with --swagger <swagger config file>");
+        var agsServer = commander['agsServer'];
+        if (!agsServer && !commander['swagger']) {
             commander.help();
+            process.exit(0);
+        }
+        if (agsServer) {
+            this.runBodyMappingTemplateParser();
         }
         this._swaggerFile = commander['swagger'];
-        this.loadApiConfig();
+        if (this._swaggerFile) {
+            this.loadApiConfig();
+            this.loadPackageJson();
+            this.processErrors();
+            this.initPlugins();
+            this.configureRoutes();
+            this.runServer();
+        }
     };
     ApiGatewaySim.prototype.processErrors = function () {
         var _this = this;
@@ -44,11 +86,11 @@ var ApiGatewaySim = (function () {
         });
     };
     ApiGatewaySim.prototype.initPlugins = function () {
-        this._express.use(cors());
+        this._gatewayServer.use(cors());
         // parse application/x-www-form-urlencoded
-        this._express.use(bodyParser.urlencoded({ extended: false }));
+        this._gatewayServer.use(bodyParser.urlencoded({ extended: false }));
         // parse application/json
-        this._express.use(bodyParser.json());
+        this._gatewayServer.use(bodyParser.json());
     };
     ApiGatewaySim.prototype.logInfo = function (message) {
         console.log(message);
@@ -155,7 +197,7 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.addRoute = function (originalPath, path, method) {
         var _this = this;
         this.logInfo("Add Route " + originalPath + ", method " + method.toUpperCase());
-        this._express[method](path, function (req, res) {
+        this._gatewayServer[method](path, function (req, res) {
             try {
                 _this._currentResponse = res;
                 var process_1 = require('child_process');
@@ -213,8 +255,14 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.runServer = function () {
         var _this = this;
-        var port = process.env['PORT'] || 3000;
-        this._express.listen(port, function (error, result) {
+        var port = process.env['PORT'];
+        if (!port) {
+            port = commander['port'];
+        }
+        if (!port) {
+            port = 3000;
+        }
+        this._gatewayServer.listen(port, function (error, result) {
             if (error) {
                 _this.errorMessage(error);
             }
