@@ -1,5 +1,8 @@
 # Change log
 
+1.1.3
+* Fix AGS UI modules when you run it the first time.
+
 1.1.0
 * AGS CLI: Add AGS UI `$ ags -a`
 * AGS CLI: Add AGS_PORT

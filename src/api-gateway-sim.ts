@@ -4,6 +4,7 @@
  */
 
 import fs = require('fs');
+import path = require('path');
 import commander = require('commander');
 import cors = require('cors');
 import bodyParser = require('body-parser');
@@ -62,7 +63,15 @@ class ApiGatewaySim {
         response.send(output);
     }
 
-    private runBodyMappingTemplateParser() {
+    private getAgsRootPath() {
+        return __dirname +path.sep+"public";
+    }
+
+    private getAgsServerModulesPath() {
+        return this.getAgsRootPath()+path.sep+'node_modules';
+    }
+
+    private runAgsServer() {
         let port = process.env['AGS_PORT'];
         if (!port) { port = commander['agsPort']; }
         if (!port) { port = 4000; }
@@ -73,6 +82,28 @@ class ApiGatewaySim {
         this._bodyTemplateServer.post('/parse', this.onParseRequest);
     }
 
+    private installAgsServerModules() {
+        this.logInfo("Installing needed modules for ags");
+        let exec = require('child_process').execSync;
+        let cmd = 'npm install --production';
+        exec(cmd, {cwd:this.getAgsRootPath()})
+    }
+
+    private argServerModulesExists() {
+        let modulesPath = this.getAgsServerModulesPath();
+        if (fs.existsSync(modulesPath)) {
+            return true;
+        }
+        return false;
+    }
+
+    private processAgsServer() {
+        if (!this.argServerModulesExists()) {
+            this.installAgsServerModules();
+        }
+        this.runAgsServer();
+    }
+
     private checkParameters() {
         let agsServer = commander['agsServer'];
         if (!agsServer && !commander['swagger']) {
@@ -81,7 +112,7 @@ class ApiGatewaySim {
         }
 
         if (agsServer) {
-            this.runBodyMappingTemplateParser();
+            this.processAgsServer();
         }
 
         this._swaggerFile = commander['swagger'];

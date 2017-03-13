@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 var fs = require('fs');
+var path = require('path');
 var commander = require('commander');
 var cors = require('cors');
 var bodyParser = require('body-parser');
@@ -46,7 +47,13 @@ var ApiGatewaySim = (function () {
         var output = bodyTemplate.parse(request.body.template);
         response.send(output);
     };
-    ApiGatewaySim.prototype.runBodyMappingTemplateParser = function () {
+    ApiGatewaySim.prototype.getAgsRootPath = function () {
+        return __dirname + path.sep + "public";
+    };
+    ApiGatewaySim.prototype.getAgsServerModulesPath = function () {
+        return this.getAgsRootPath() + path.sep + 'node_modules';
+    };
+    ApiGatewaySim.prototype.runAgsServer = function () {
         var port = process.env['AGS_PORT'];
         if (!port) {
             port = commander['agsPort'];
@@ -60,6 +67,25 @@ var ApiGatewaySim = (function () {
         this._bodyTemplateServer.use(bodyParser.json());
         this._bodyTemplateServer.post('/parse', this.onParseRequest);
     };
+    ApiGatewaySim.prototype.installAgsServerModules = function () {
+        this.logInfo("Installing needed modules for ags");
+        var exec = require('child_process').execSync;
+        var cmd = 'npm install --production';
+        exec(cmd, { cwd: this.getAgsRootPath() });
+    };
+    ApiGatewaySim.prototype.argServerModulesExists = function () {
+        var modulesPath = this.getAgsServerModulesPath();
+        if (fs.existsSync(modulesPath)) {
+            return true;
+        }
+        return false;
+    };
+    ApiGatewaySim.prototype.processAgsServer = function () {
+        if (!this.argServerModulesExists()) {
+            this.installAgsServerModules();
+        }
+        this.runAgsServer();
+    };
     ApiGatewaySim.prototype.checkParameters = function () {
         var agsServer = commander['agsServer'];
         if (!agsServer && !commander['swagger']) {
@@ -67,7 +93,7 @@ var ApiGatewaySim = (function () {
             process.exit(0);
         }
         if (agsServer) {
-            this.runBodyMappingTemplateParser();
+            this.processAgsServer();
         }
         this._swaggerFile = commander['swagger'];
         if (this._swaggerFile) {
@@ -249,8 +275,8 @@ var ApiGatewaySim = (function () {
         }
     };
     ApiGatewaySim.prototype.configureRoutes = function () {
-        for (var path in this._apiConfigJson.paths) {
-            this.configurePath(path);
+        for (var path_1 in this._apiConfigJson.paths) {
+            this.configurePath(path_1);
         }
     };
     ApiGatewaySim.prototype.runServer = function () {
