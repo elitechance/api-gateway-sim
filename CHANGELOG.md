@@ -1,5 +1,8 @@
 # Change log
 
+1.1.4
+* Fix ags modules
+
 1.1.3
 * Fix AGS UI modules when you run it the first time.
 
