@@ -39,6 +39,7 @@ class ApiGatewaySim {
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
             .option('-p, --port <port>', 'Api gateway port, default is 3000')
             .option('-a, --ags-server', 'Run AGS UI')
+            .option('-b, --with-basepath', 'Include base path in the endpoint')
             .option('-g, --ags-port <port>', 'AGS UI port, default is 4000')
             .parse(process.argv);
     }
@@ -244,9 +245,19 @@ class ApiGatewaySim {
         }
     }
 
+    private getBasePath() {
+        let withBasePath = commander['withBasepath'];
+        let basePath = '';
+        if (withBasePath) {
+            basePath = this._apiConfigJson.basePath;
+        }
+        return basePath;
+    }
+
     private addRoute(originalPath, path, method) {
-        this.logInfo("Add Route "+originalPath+", method "+method.toUpperCase());
-        this._gatewayServer[method](path, (req, res) => {
+        let basePath = this.getBasePath();
+        this.logInfo("Add Route "+basePath+originalPath+", method "+method.toUpperCase());
+        this._gatewayServer[method](basePath+path, (req, res) => {
             try {
                 this._currentResponse = res;
                 let process = require('child_process');

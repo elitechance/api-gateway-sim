@@ -1,5 +1,8 @@
 # Change log
 
+1.1.5
+* Support for base path
+
 1.1.4
 * Fix ags modules
 

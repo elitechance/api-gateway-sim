@@ -26,6 +26,7 @@ var ApiGatewaySim = (function () {
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
             .option('-p, --port <port>', 'Api gateway port, default is 3000')
             .option('-a, --ags-server', 'Run AGS UI')
+            .option('-b, --with-basepath', 'Include base path in the endpoint')
             .option('-g, --ags-port <port>', 'AGS UI port, default is 4000')
             .parse(process.argv);
     };
@@ -220,10 +221,19 @@ var ApiGatewaySim = (function () {
             httpResponse.send(lambdaResponse.message);
         }
     };
+    ApiGatewaySim.prototype.getBasePath = function () {
+        var withBasePath = commander['withBasepath'];
+        var basePath = '';
+        if (withBasePath) {
+            basePath = this._apiConfigJson.basePath;
+        }
+        return basePath;
+    };
     ApiGatewaySim.prototype.addRoute = function (originalPath, path, method) {
         var _this = this;
-        this.logInfo("Add Route " + originalPath + ", method " + method.toUpperCase());
-        this._gatewayServer[method](path, function (req, res) {
+        var basePath = this.getBasePath();
+        this.logInfo("Add Route " + basePath + originalPath + ", method " + method.toUpperCase());
+        this._gatewayServer[method](basePath + path, function (req, res) {
             try {
                 _this._currentResponse = res;
                 var process_1 = require('child_process');

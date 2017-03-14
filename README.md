@@ -44,6 +44,7 @@ Command Line Help
     -t, --stage-variables <file>    Default file stage-variables.json file
     -p, --port <port>               Api gateway port, default 3000
     -a, --ags-server                Run AGS UI
+    -b, --with-basepath             Include base path in the endpoint
     -g, --ags-port <port>           AGS UI port, default 4000
 ```
 
@@ -64,4 +65,5 @@ $ ags -a
 * Monitor changes in event.json, context.json, and stage-variables.json
 * CORS - enabled by default
 * Supports lambda timeout
+* Supports base path
 
