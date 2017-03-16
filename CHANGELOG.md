@@ -1,5 +1,9 @@
 # Change log
 
+1.2.0
+* Support for strict CORS
+* Refactor Api Gateway config parsing using Config class
+
 1.1.5
 * Support for base path
 

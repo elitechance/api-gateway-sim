@@ -13,15 +13,23 @@ import Request = express.Request;
 import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Yaml = require('js-yaml');
+import Config from "./lib/aws/gateway/config";
+import Path from "./lib/aws/gateway/config/path";
+import PathMethod from "./lib/aws/gateway/config/path-method";
+import ConfigMethods from "./lib/aws/gateway/config/methods";
+import PathMethodIntegrationResponse from "./lib/aws/gateway/config/path-method-integration-response";
+import PathMethodResponse from "./lib/aws/gateway/config/path-method-response";
+import PathMethodIntegrationResponseRequestTemplate from "./lib/aws/gateway/config/path-method-integration-response-request-template";
 
 class ApiGatewaySim {
     private _packageJson;
     private _localPackageJson;
-    private _apiConfigJson;
     private _gatewayServer = express();
     private _bodyTemplateServer = express();
     private _swaggerFile:string;
     private _currentResponse;
+    private _apiGatewayConfig:Config = new Config();
+    private _strictCors:boolean = false;
 
     constructor() {
         this.loadLocalPackageJson();
@@ -40,6 +48,7 @@ class ApiGatewaySim {
             .option('-p, --port <port>', 'Api gateway port, default is 3000')
             .option('-a, --ags-server', 'Run AGS UI')
             .option('-b, --with-basepath', 'Include base path in the endpoint')
+            .option('-u, --strict-cors', 'Enable CORS base on config file')
             .option('-g, --ags-port <port>', 'AGS UI port, default is 4000')
             .parse(process.argv);
     }
@@ -116,6 +125,7 @@ class ApiGatewaySim {
             this.processAgsServer();
         }
 
+        this._strictCors = commander['strictCors'];
         this._swaggerFile = commander['swagger'];
         if (this._swaggerFile) {
             this.loadApiConfig();
@@ -134,7 +144,15 @@ class ApiGatewaySim {
     }
 
     private initPlugins() {
-        this._gatewayServer.use(cors());
+        // Enable CORS by default for backward compatibility
+        if (!this._strictCors) {
+            this.logInfo("Enable default CORS");
+            this._gatewayServer.use(cors());
+        }
+        else {
+            this.logInfo("Using strict CORS");
+        }
+
         // parse application/x-www-form-urlencoded
         this._gatewayServer.use(bodyParser.urlencoded({ extended: false }));
         // parse application/json
@@ -152,17 +170,17 @@ class ApiGatewaySim {
         return query;
     }
 
-    private getRequestTemplates(path, method) {
-        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
-        return this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['requestTemplates'];
+    private getRequestTemplate(method:PathMethod, contentType:string):string {
+        for (let index in method.integration.requestTemplates) {
+            let template:PathMethodIntegrationResponseRequestTemplate = method.integration.requestTemplates[index];
+            if (template.contentType == contentType) {
+                return template.template;
+            }
+        }
+        return "";
     }
 
-    private getRequestTemplate(path, method, contentType) {
-        let templates = this.getRequestTemplates(path, method);
-        return templates[contentType];
-    }
-
-    private parseEvent(path:string, method:string, request:Request) {
+    private parseEvent(method:PathMethod, request:Request) {
         let bodyTemplate = new BodyTemplate();
         bodyTemplate.context = this.getContextJson();
         bodyTemplate.headers = request.headers;
@@ -176,9 +194,9 @@ class ApiGatewaySim {
         bodyTemplate.method = request.method;
         bodyTemplate.payload = JSON.stringify(request.body);
         bodyTemplate.stageVariables = this.getStageVariables();
-        let contextType = request.headers['content-type'];
+        let contextType:string = request.headers['content-type'];
         if (!contextType) { contextType = 'application/json'; }
-        let template = this.getRequestTemplate(path, method, contextType);
+        let template = this.getRequestTemplate(method, contextType);
         if (!template) { return ""; }
         let compiled = bodyTemplate.parse(template);
         return compiled;
@@ -192,18 +210,11 @@ class ApiGatewaySim {
         return 3; // default;
     }
 
-    private getProperStatus(path, method, errorMessage) {
-        if (method == 'all') { method = 'x-amazon-apigateway-any-method'; }
-        let responses = this._apiConfigJson.paths[path][method]['x-amazon-apigateway-integration']['responses'];
-        for (let response in responses) {
-            if (response != 'default') {
-                let regularExpress = new RegExp(response);
-                if (errorMessage.match(regularExpress)) {
-                    return responses[response].statusCode;
-                }
-            }
+    private getAwsMethod(method:string) {
+        if (method === 'all') {
+            return ConfigMethods.ANY;
         }
-        return 200;
+        return method;
     }
 
     private sendErrorResponse(error:Error) {
@@ -214,8 +225,8 @@ class ApiGatewaySim {
         }
     }
 
-    private getRequest(originalPath:string, method:string, request:Request) {
-        let jsonEncodedEvent = this.parseEvent(originalPath, method, request);
+    private getRequest(method:PathMethod, request:Request) {
+        let jsonEncodedEvent = this.parseEvent(method, request);
         let event = JSON.parse(jsonEncodedEvent);
         let eventJson = Object['assign'](this.getEventJson(), event);
         return {
@@ -227,7 +238,53 @@ class ApiGatewaySim {
         };
     }
 
-    private processHandlerResponse(originalPath:string, method:string, httpResponse:Response, lambdaResponse) {
+    private getMethodResponseByStatusCode(method:PathMethod, statusCode:number):PathMethodResponse {
+        for(let index in method.responses) {
+            let response = method.responses[index];
+            if (response.statusCode == statusCode) {
+                return response;
+            }
+        }
+        return null;
+    }
+
+    private getIntegrationResponseByErrorMessage(method:PathMethod, errorMessage:string):PathMethodIntegrationResponse {
+        let regularExpress:RegExp;
+        let defaultResponse;
+        for(let index in method.integration.responses) {
+            let response = method.integration.responses[index];
+            if (response.pattern == 'default') { defaultResponse = response; }
+            regularExpress = new RegExp(response.pattern);
+            if (errorMessage.match(regularExpress)) {
+                return response;
+            }
+        }
+        return defaultResponse;
+    }
+
+    private getDefaultIntegrationResponse(method:PathMethod):PathMethodIntegrationResponse {
+        for(let index in method.integration.responses) {
+            let response = method.integration.responses[index];
+            if (response.pattern == 'default') { return response; }
+        }
+    }
+
+    private setHeadersByIntegrationResponse(integrationResponse:PathMethodIntegrationResponse, method:PathMethod, httpResponse:Response) {
+        let methodResponse:PathMethodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
+        for(let headerIndex in methodResponse.headers) {
+            for (let responseParameterIndex in integrationResponse.responseParameters) {
+                let headerName = integrationResponse.responseParameters[responseParameterIndex].header;
+                let headerValue = integrationResponse.responseParameters[responseParameterIndex].value;
+                let methodResponseHeader = methodResponse.headers[headerIndex];
+                let responseHeader = integrationResponse.baseHeaderName + '.' + methodResponseHeader
+                if (responseHeader == headerName) {
+                    httpResponse.setHeader(methodResponseHeader, headerValue);
+                }
+            }
+        }
+    }
+
+    private processHandlerResponse(method:PathMethod, httpResponse:Response, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
             httpResponse.send({errorMessage:lambdaResponse.error});
         }
@@ -236,36 +293,57 @@ class ApiGatewaySim {
         }
         else if (lambdaResponse.error) {
             let error = lambdaResponse.error;
-            let status = this.getProperStatus(originalPath, method, error.message);
+            let integrationResponse = this.getIntegrationResponseByErrorMessage(method, error.message);
+            if (this._strictCors) {
+                this.setHeadersByIntegrationResponse(integrationResponse, method, httpResponse);
+            }
             httpResponse.statusMessage = error.message;
-            httpResponse.status(status).end();
+            httpResponse.status(integrationResponse.statusCode).end();
         }
         else {
+            if (this._strictCors) {
+                this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
+            }
             httpResponse.send(lambdaResponse.message);
         }
     }
 
     private getBasePath() {
-        let withBasePath = commander['withBasepath'];
         let basePath = '';
+
+        let withBasePath = commander['withBasepath'];
         if (withBasePath) {
-            basePath = this._apiConfigJson.basePath;
+            basePath = this._apiGatewayConfig.basePath;
         }
         return basePath;
     }
 
-    private addRoute(originalPath, path, method) {
+    private replacePathParams(path):string {
+        if (!path) { return path; }
+        return path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
+    }
+
+    private getExpressMethod(methodName:string) {
+        if (methodName == ConfigMethods.ANY) {
+            return 'all';
+        }
+        return methodName;
+    }
+
+    private configureRoutePathMethod(path:Path, method:PathMethod) {
         let basePath = this.getBasePath();
-        this.logInfo("Add Route "+basePath+originalPath+", method "+method.toUpperCase());
-        this._gatewayServer[method](basePath+path, (req, res) => {
+        let expressPath = this.replacePathParams(basePath+path.value);
+        let expressMethod = this.getExpressMethod(method.name);
+        this.logInfo("Add Route "+basePath+path.value+", method "+expressMethod.toUpperCase());
+        this._gatewayServer[expressMethod](expressPath, (req, res) => {
             try {
                 this._currentResponse = res;
                 let process = require('child_process');
                 let parent = process.fork(__dirname+'/lib/handler');
                 parent.on('message', (message) =>{
-                    this.processHandlerResponse(originalPath, method, res, message);
+                    this.processHandlerResponse(method, res, message);
                 });
-                let request = this.getRequest(originalPath, method, req);
+                let request = this.getRequest(method, req);
                 parent.send(request);
             }
             catch (error) {
@@ -274,40 +352,15 @@ class ApiGatewaySim {
         });
     }
 
-    private hasPathParams(path) {
-        if (!path) { return false; }
-        if (path.match(/{[a-zA-Z0-9]+}/)) {
-            return true;
-        }
-        return false;
-    }
-
-    private replacePathParams(path) {
-        if (!path) { return path; }
-        return path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
-    }
-
-    private configurePathMethod(path:string, method:string) {
-        let hasPathParams = this.hasPathParams(path);
-        let originalPath = path;
-        if (hasPathParams) {
-            path = this.replacePathParams(path);
-        }
-        switch (method) {
-            case 'x-amazon-apigateway-any-method':this.addRoute(originalPath, path, 'all'); break;
-            default: this.addRoute(originalPath, path, method); break;
-        }
-    }
-
-    private configurePath(path) {
-        for(let method in this._apiConfigJson.paths[path]) {
-            this.configurePathMethod(path, method);
+    private configureRoutePath(path:Path) {
+        for(let index in path.methods) {
+            this.configureRoutePathMethod(path, path.methods[index]);
         }
     }
 
     private configureRoutes() {
-        for(let path in this._apiConfigJson.paths) {
-            this.configurePath(path);
+        for(let index in this._apiGatewayConfig.paths) {
+            this.configureRoutePath(this._apiGatewayConfig.paths[index]);
         }
     }
 
@@ -392,25 +445,7 @@ class ApiGatewaySim {
     }
 
     private loadApiConfig() {
-        try {
-            let configFile = this._swaggerFile;
-            if (configFile.match(/\.json$/)) {
-                let configJson = fs.readFileSync(configFile, 'utf8');
-                this._apiConfigJson = JSON.parse(configJson);
-            }
-            else if (configFile.match(/\.yaml$/)) {
-                let configJson = fs.readFileSync(configFile, 'utf8');
-                this._apiConfigJson = Yaml.safeLoad(configJson);
-            }
-            else if (configFile.match(/\.yml$/)) {
-                let configJson = fs.readFileSync(configFile, 'utf8');
-                this._apiConfigJson = Yaml.safeLoad(configJson);
-            }
-            if (!this._apiConfigJson) { this.errorMessage("Unable to open config file "+configFile); }
-        }
-        catch (error) {
-            this.errorMessage("Unable to open swagger file "+this._swaggerFile+"\nError: "+JSON.stringify(error));
-        }
+        this._apiGatewayConfig.loadFile(this._swaggerFile);
     }
 
 }

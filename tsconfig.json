@@ -12,10 +12,23 @@
   "exclude": [
     "node_modules"
   ],
+  "include":["src/**/*"],
   "files": [
     "src/api-gateway-sim.ts",
     "src/lib/callback.ts",
     "src/lib/handler.ts",
+    "src/lib/aws/gateway/body-template.ts",
+    "src/lib/aws/gateway/config.ts",
+    "src/lib/aws/gateway/config/info.ts",
+    "src/lib/aws/gateway/config/methods.ts",
+    "src/lib/aws/gateway/config/path.ts",
+    "src/lib/aws/gateway/config/path-method.ts",
+    "src/lib/aws/gateway/config/path-method-response.ts",
+    "src/lib/aws/gateway/config/path-method-integration.ts",
+    "src/lib/aws/gateway/config/path-method-integration-response.ts",
+    "src/lib/aws/gateway/config/path-method-integration-response-parameter.ts",
+    "src/lib/aws/gateway/config/path-method-integration-response-request-template.ts",
+    "src/lib/aws/gateway/config/path-method-response-status.ts",
     "src/lib/aws/gateway/util.ts",
     "src/lib/aws/gateway/input.ts"
   ]

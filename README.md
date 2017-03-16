@@ -45,6 +45,7 @@ Command Line Help
     -p, --port <port>               Api gateway port, default 3000
     -a, --ags-server                Run AGS UI
     -b, --with-basepath             Include base path in the endpoint
+    -u, --strict-cors               Enable CORS base on config file
     -g, --ags-port <port>           AGS UI port, default 4000
 ```
 
