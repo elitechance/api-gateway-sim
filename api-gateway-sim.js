@@ -196,8 +196,15 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.getRequest = function (method, request) {
         var jsonEncodedEvent = this.parseEvent(method, request);
-        var event = JSON.parse(jsonEncodedEvent);
-        var eventJson = Object['assign'](this.getEventJson(), event);
+        var event;
+        var eventJson;
+        if (jsonEncodedEvent) {
+            event = JSON.parse(jsonEncodedEvent);
+            eventJson = Object['assign'](this.getEventJson(), event);
+        }
+        else {
+            eventJson = this.getEventJson();
+        }
         return {
             eventJson: eventJson,
             packageJson: this._packageJson,
@@ -240,6 +247,9 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.setHeadersByIntegrationResponse = function (integrationResponse, method, httpResponse) {
         var methodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
+        if (methodResponse == null) {
+            return;
+        }
         for (var headerIndex in methodResponse.headers) {
             for (var responseParameterIndex in integrationResponse.responseParameters) {
                 var headerName = integrationResponse.responseParameters[responseParameterIndex].header;
@@ -252,7 +262,7 @@ var ApiGatewaySim = (function () {
             }
         }
     };
-    ApiGatewaySim.prototype.processHandlerResponse = function (method, httpResponse, lambdaResponse) {
+    ApiGatewaySim.prototype.processHandlerResponse = function (method, httpRequest, httpResponse, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
             httpResponse.send({ errorMessage: lambdaResponse.error });
         }
@@ -269,10 +279,15 @@ var ApiGatewaySim = (function () {
             httpResponse.status(integrationResponse.statusCode).end();
         }
         else {
-            if (this._strictCors) {
-                this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
+            if (httpRequest.method != 'HEAD') {
+                if (this._strictCors) {
+                    this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
+                }
+                httpResponse.send(lambdaResponse.message);
             }
-            httpResponse.send(lambdaResponse.message);
+            else {
+                httpResponse.status(200).end();
+            }
         }
     };
     ApiGatewaySim.prototype.getBasePath = function () {
@@ -287,7 +302,9 @@ var ApiGatewaySim = (function () {
         if (!path) {
             return path;
         }
-        return path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
+        path = path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
+        path = path.replace(/{([a-zA-Z]+\+)}/g, "*");
+        return path;
     };
     ApiGatewaySim.prototype.getExpressMethod = function (methodName) {
         if (methodName == methods_1.default.ANY) {
@@ -307,7 +324,7 @@ var ApiGatewaySim = (function () {
                 var process_1 = require('child_process');
                 var parent_1 = process_1.fork(__dirname + '/lib/handler');
                 parent_1.on('message', function (message) {
-                    _this.processHandlerResponse(method, res, message);
+                    _this.processHandlerResponse(method, req, res, message);
                 });
                 var request = _this.getRequest(method, req);
                 parent_1.send(request);

@@ -227,8 +227,16 @@ class ApiGatewaySim {
 
     private getRequest(method:PathMethod, request:Request) {
         let jsonEncodedEvent = this.parseEvent(method, request);
-        let event = JSON.parse(jsonEncodedEvent);
-        let eventJson = Object['assign'](this.getEventJson(), event);
+        let event;
+        let eventJson;
+        if (jsonEncodedEvent) {
+            event = JSON.parse(jsonEncodedEvent);
+            eventJson = Object['assign'](this.getEventJson(), event);
+        }
+        else {
+            eventJson = this.getEventJson();
+        }
+
         return {
             eventJson:eventJson,
             packageJson:this._packageJson,
@@ -271,6 +279,7 @@ class ApiGatewaySim {
 
     private setHeadersByIntegrationResponse(integrationResponse:PathMethodIntegrationResponse, method:PathMethod, httpResponse:Response) {
         let methodResponse:PathMethodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
+        if (methodResponse == null) {return;}
         for(let headerIndex in methodResponse.headers) {
             for (let responseParameterIndex in integrationResponse.responseParameters) {
                 let headerName = integrationResponse.responseParameters[responseParameterIndex].header;
@@ -284,7 +293,7 @@ class ApiGatewaySim {
         }
     }
 
-    private processHandlerResponse(method:PathMethod, httpResponse:Response, lambdaResponse) {
+    private processHandlerResponse(method:PathMethod, httpRequest:Request, httpResponse:Response, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
             httpResponse.send({errorMessage:lambdaResponse.error});
         }
@@ -301,10 +310,15 @@ class ApiGatewaySim {
             httpResponse.status(integrationResponse.statusCode).end();
         }
         else {
-            if (this._strictCors) {
-                this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
+            if (httpRequest.method != 'HEAD') {
+                if (this._strictCors) {
+                    this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
+                }
+                httpResponse.send(lambdaResponse.message);
             }
-            httpResponse.send(lambdaResponse.message);
+            else {
+                httpResponse.status(200).end();
+            }
         }
     }
 
@@ -320,7 +334,9 @@ class ApiGatewaySim {
 
     private replacePathParams(path):string {
         if (!path) { return path; }
-        return path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
+        path = path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
+        path = path.replace(/{([a-zA-Z]+\+)}/g, "*");
+        return path;
     }
 
     private getExpressMethod(methodName:string) {
@@ -341,7 +357,7 @@ class ApiGatewaySim {
                 let process = require('child_process');
                 let parent = process.fork(__dirname+'/lib/handler');
                 parent.on('message', (message) =>{
-                    this.processHandlerResponse(method, res, message);
+                    this.processHandlerResponse(method, req, res, message);
                 });
                 let request = this.getRequest(method, req);
                 parent.send(request);

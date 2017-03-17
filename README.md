@@ -67,4 +67,5 @@ $ ags -a
 * CORS - enabled by default
 * Supports lambda timeout
 * Supports base path
+* Supports {proxy+}
 
