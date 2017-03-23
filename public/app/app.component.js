@@ -8,11 +8,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var core_1 = require('@angular/core');
+Object.defineProperty(exports, "__esModule", { value: true });
+var core_1 = require("@angular/core");
 var http_1 = require("@angular/http");
 var AppComponent = (function () {
     function AppComponent(http) {
         this.http = http;
+        this.eventValueValid = true;
         this.menus = [
             { id: 1, name: "Headers", active: false, error: false },
             { id: 2, name: "Body", active: false, error: false },
@@ -255,6 +257,15 @@ var AppComponent = (function () {
         }
         return true;
     };
+    AppComponent.prototype.validateEventValue = function (value) {
+        try {
+            JSON.parse(value);
+            this.eventValueValid = true;
+        }
+        catch (error) {
+            this.eventValueValid = false;
+        }
+    };
     AppComponent.prototype.parseTemplate = function () {
         var _this = this;
         if (!this.contentClean()) {
@@ -264,6 +275,7 @@ var AppComponent = (function () {
             var request = this.getRequest();
             this.http.post('/parse', request).subscribe(function (response) {
                 _this.editorOutput.setValue(response.text());
+                _this.validateEventValue(response.text());
             });
         }
         catch (error) {
@@ -279,46 +291,46 @@ var AppComponent = (function () {
         this.parseTemplate();
         this.activeMenu = this.menus[0].id;
     };
-    __decorate([
-        core_1.ViewChild('elementHeader'), 
-        __metadata('design:type', core_1.ElementRef)
-    ], AppComponent.prototype, "elementHeader", void 0);
-    __decorate([
-        core_1.ViewChild('elementBody'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementBody", void 0);
-    __decorate([
-        core_1.ViewChild('elementStageVariables'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementStageVariables", void 0);
-    __decorate([
-        core_1.ViewChild('elementContext'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementContext", void 0);
-    __decorate([
-        core_1.ViewChild('elementQueryParams'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementQueryParams", void 0);
-    __decorate([
-        core_1.ViewChild('elementPathParams'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementPathParams", void 0);
-    __decorate([
-        core_1.ViewChild('elementTemplate'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementTemplate", void 0);
-    __decorate([
-        core_1.ViewChild('elementOutput'), 
-        __metadata('design:type', Object)
-    ], AppComponent.prototype, "elementOutput", void 0);
-    AppComponent = __decorate([
-        core_1.Component({
-            selector: 'ags-app',
-            templateUrl: '/app/app.component.html',
-        }), 
-        __metadata('design:paramtypes', [http_1.Http])
-    ], AppComponent);
     return AppComponent;
 }());
+__decorate([
+    core_1.ViewChild('elementHeader'),
+    __metadata("design:type", core_1.ElementRef)
+], AppComponent.prototype, "elementHeader", void 0);
+__decorate([
+    core_1.ViewChild('elementBody'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementBody", void 0);
+__decorate([
+    core_1.ViewChild('elementStageVariables'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementStageVariables", void 0);
+__decorate([
+    core_1.ViewChild('elementContext'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementContext", void 0);
+__decorate([
+    core_1.ViewChild('elementQueryParams'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementQueryParams", void 0);
+__decorate([
+    core_1.ViewChild('elementPathParams'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementPathParams", void 0);
+__decorate([
+    core_1.ViewChild('elementTemplate'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementTemplate", void 0);
+__decorate([
+    core_1.ViewChild('elementOutput'),
+    __metadata("design:type", Object)
+], AppComponent.prototype, "elementOutput", void 0);
+AppComponent = __decorate([
+    core_1.Component({
+        selector: 'ags-app',
+        templateUrl: '/app/app.component.html',
+    }),
+    __metadata("design:paramtypes", [http_1.Http])
+], AppComponent);
 exports.AppComponent = AppComponent;
 //# sourceMappingURL=app.component.js.map

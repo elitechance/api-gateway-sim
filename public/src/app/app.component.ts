@@ -32,6 +32,8 @@ export class AppComponent implements  OnInit {
     private syntaxError:string;
     private bodyTemplates:any;
 
+    private eventValueValid:boolean = true;
+
     private menus = [
         {id:1, name:"Headers", active:false, error:false},
         {id:2, name:"Body", active:false, error:false},
@@ -278,6 +280,15 @@ export class AppComponent implements  OnInit {
         return true;
     }
 
+    private validateEventValue(value:string) {
+        try {
+            JSON.parse(value);
+            this.eventValueValid = true;
+        } catch (error) {
+            this.eventValueValid = false;
+        }
+    }
+
     private parseTemplate() {
         if (!this.contentClean()) {
             return;
@@ -286,6 +297,7 @@ export class AppComponent implements  OnInit {
             let request = this.getRequest();
             this.http.post('/parse', request).subscribe((response)=>{
                 this.editorOutput.setValue(response.text());
+                this.validateEventValue(response.text());
             });
         }
         catch (error) {

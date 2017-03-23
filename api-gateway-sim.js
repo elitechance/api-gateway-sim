@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 "use strict";
-var fs = require('fs');
-var path = require('path');
-var commander = require('commander');
-var cors = require('cors');
-var bodyParser = require('body-parser');
-var express = require('express');
+Object.defineProperty(exports, "__esModule", { value: true });
+var fs = require("fs");
+var path = require("path");
+var commander = require("commander");
+var cors = require("cors");
+var bodyParser = require("body-parser");
+var express = require("express");
 var body_template_1 = require("./lib/aws/gateway/body-template");
 var config_1 = require("./lib/aws/gateway/config");
 var methods_1 = require("./lib/aws/gateway/config/methods");

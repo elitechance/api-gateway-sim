@@ -1,5 +1,9 @@
 # Change log
 
+1.2.2
+* AGS UI: Support `event` variable value parsing status 
+* Include transpiled js files for lib/aws/gateway/config**
+
 1.2.1
 * Add support for {proxy+}
 
