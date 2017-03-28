@@ -12,6 +12,15 @@ export default class PathMethod {
     private _responses:Array<PathMethodResponse> = [];
     private _integration:PathMethodIntegration;
 
+    canConsume(contentType:string):boolean {
+        for(let index in this.consumes) {
+            if (this.consumes[index] == contentType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     get name(): string {
         return this._name;
     }

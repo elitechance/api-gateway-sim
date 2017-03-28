@@ -1,0 +1,12 @@
+{
+    "httpMethod": "$context.httpMethod",
+    "body" : $input.json('$'),
+    "path": "$context.resourcePath",
+    "headers": {
+        #foreach($param in $input.params().header.keySet())
+        "$param": "$util.escapeJavaScript($input.params().header.get($param))" #if($foreach.hasNext),#end #end },
+    "queryStringParameters": { #foreach($param in $input.params().querystring.keySet())
+        "$param": "$util.escapeJavaScript($input.params().querystring.get($param))" #if($foreach.hasNext),#end #end },
+    "pathParameters": { #foreach($param in $input.params().path.keySet())
+        "$param": "$util.escapeJavaScript($input.params().path.get($param))" #if($foreach.hasNext),#end #end }
+}

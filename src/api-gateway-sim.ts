@@ -13,6 +13,7 @@ import Request = express.Request;
 import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Yaml = require('js-yaml');
+import HttpStatus from "./lib/http-status";
 import Config from "./lib/aws/gateway/config";
 import Path from "./lib/aws/gateway/config/path";
 import PathMethod from "./lib/aws/gateway/config/path-method";
@@ -170,19 +171,46 @@ class ApiGatewaySim {
         return query;
     }
 
+    private getPassThroughTemplateContent() {
+        let file = __dirname+'/templates/pass-through.vtl';
+        return fs.readFileSync(file, 'utf8');
+    }
+
+    private getPassThroughTemplate(type) {
+        switch (type) {
+            case 'when_no_match': return this.getPassThroughTemplateContent();
+            case 'never': return "";
+            default: return this.getPassThroughTemplateContent();
+        }
+    }
+
     private getRequestTemplate(method:PathMethod, contentType:string):string {
+        let templateValue:string = '';
         for (let index in method.integration.requestTemplates) {
             let template:PathMethodIntegrationResponseRequestTemplate = method.integration.requestTemplates[index];
             if (template.contentType == contentType) {
-                return template.template;
+                templateValue = template.template;
             }
         }
-        return "";
+
+        if (!templateValue && method.canConsume(contentType)) {
+            return this.getPassThroughTemplateContent();
+        }
+
+        if (!templateValue) {
+            return this.getPassThroughTemplate(method.integration.passthroughBehavior);
+        }
+    }
+
+    private setHttpRequestContext(context:any, request:Request) {
+        context.httpMethod = request.method;
+        context.resourcePath = request.path;
     }
 
     private parseEvent(method:PathMethod, request:Request) {
         let bodyTemplate = new BodyTemplate();
         bodyTemplate.context = this.getContextJson();
+        this.setHttpRequestContext(bodyTemplate.context, request);
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -256,27 +284,6 @@ class ApiGatewaySim {
         return null;
     }
 
-    private getIntegrationResponseByErrorMessage(method:PathMethod, errorMessage:string):PathMethodIntegrationResponse {
-        let regularExpress:RegExp;
-        let defaultResponse;
-        for(let index in method.integration.responses) {
-            let response = method.integration.responses[index];
-            if (response.pattern == 'default') { defaultResponse = response; }
-            regularExpress = new RegExp(response.pattern);
-            if (errorMessage.match(regularExpress)) {
-                return response;
-            }
-        }
-        return defaultResponse;
-    }
-
-    private getDefaultIntegrationResponse(method:PathMethod):PathMethodIntegrationResponse {
-        for(let index in method.integration.responses) {
-            let response = method.integration.responses[index];
-            if (response.pattern == 'default') { return response; }
-        }
-    }
-
     private setHeadersByIntegrationResponse(integrationResponse:PathMethodIntegrationResponse, method:PathMethod, httpResponse:Response) {
         let methodResponse:PathMethodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
         if (methodResponse == null) {return;}
@@ -293,16 +300,80 @@ class ApiGatewaySim {
         }
     }
 
+    private sendHttpErrorResponse(httpResponse:Response, message:string) {
+        httpResponse.send({errorMessage:message});
+    }
+
+    private sendHttpErrorBadGateway(httpResponse:Response, message:string) {
+        httpResponse.statusMessage = HttpStatus.getMessageByCode(502);
+        httpResponse.statusCode = 502;
+        httpResponse.send({message:message});
+    }
+
+    private sendHttpErrorUnsupportedType(httpResponse:Response) {
+        let message = HttpStatus.getMessageByCode(415);
+        httpResponse.statusMessage = message;
+        httpResponse.statusCode = 415;
+        httpResponse.send({message:message});
+    }
+
+    private validProxyProperties(message) {
+        let validProperties = {body:true, statusCode:true, headers:true};
+        for (let property in message) {
+            if (!validProperties[property]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private sendAwsProxyResponse(httpResponse:Response, method:PathMethod, message:any) {
+        let errorMessage = "Internal server error";
+        if (!message.body) {
+            return this.sendHttpErrorBadGateway(httpResponse, errorMessage)
+        }
+        try {
+            let parseBody = JSON.parse(message.body);
+            if(!this.validProxyProperties(message)) {
+                return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
+            }
+            else {
+                if (message.statusCode) {
+                    httpResponse.statusCode = message.statusCode;
+                    httpResponse.statusMessage = HttpStatus.getMessageByCode(message.statusCode);
+                }
+                this.sendDefaultResponse(httpResponse, method, parseBody);
+            }
+        }
+        catch (error) {
+            return this.sendHttpErrorBadGateway(httpResponse, error+"")
+        }
+    }
+
+    private sendDefaultResponse(httpResponse:Response, method:PathMethod, message:any) {
+        if (this._strictCors) {
+            this.setHeadersByIntegrationResponse(method.integration.defaultResponse, method, httpResponse);
+        }
+        httpResponse.send(message);
+    }
+
+    private sendHttpSuccessResponse(httpResponse:Response, method:PathMethod, message:any) {
+        switch (method.integration.type) {
+            case 'aws_proxy': this.sendAwsProxyResponse(httpResponse, method, message); break;
+            default: this.sendDefaultResponse(httpResponse, method, message);
+        }
+    }
+
     private processHandlerResponse(method:PathMethod, httpRequest:Request, httpResponse:Response, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
-            httpResponse.send({errorMessage:lambdaResponse.error});
+            this.sendHttpErrorResponse(httpResponse, lambdaResponse.error);
         }
         else if (lambdaResponse.timeout) {
-            httpResponse.send({errorMessage:"Task timed out after "+this.getLambdaTimeout()+".00 seconds"});
+            this.sendHttpErrorResponse(httpResponse,"Task timed out after "+this.getLambdaTimeout()+".00 seconds");
         }
         else if (lambdaResponse.error) {
             let error = lambdaResponse.error;
-            let integrationResponse = this.getIntegrationResponseByErrorMessage(method, error.message);
+            let integrationResponse = method.integration.getResponseByErrorMessage(error.message);
             if (this._strictCors) {
                 this.setHeadersByIntegrationResponse(integrationResponse, method, httpResponse);
             }
@@ -311,10 +382,7 @@ class ApiGatewaySim {
         }
         else {
             if (httpRequest.method != 'HEAD') {
-                if (this._strictCors) {
-                    this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
-                }
-                httpResponse.send(lambdaResponse.message);
+                this.sendHttpSuccessResponse(httpResponse, method, lambdaResponse.message);
             }
             else {
                 httpResponse.status(200).end();
@@ -346,6 +414,16 @@ class ApiGatewaySim {
         return methodName;
     }
 
+    private validRequest(method:PathMethod, httpRequest:Request) {
+        let contentType = httpRequest.headers['content-type'];
+        if (!contentType) { contentType = 'application/json'; }
+        let template = this.getRequestTemplate(method, contentType);
+        if (template) {
+            return true;
+        }
+        return false;
+    }
+
     private configureRoutePathMethod(path:Path, method:PathMethod) {
         let basePath = this.getBasePath();
         let expressPath = this.replacePathParams(basePath+path.value);
@@ -356,11 +434,16 @@ class ApiGatewaySim {
                 this._currentResponse = res;
                 let process = require('child_process');
                 let parent = process.fork(__dirname+'/lib/handler');
-                parent.on('message', (message) =>{
-                    this.processHandlerResponse(method, req, res, message);
-                });
-                let request = this.getRequest(method, req);
-                parent.send(request);
+                if (this.validRequest(method, req)) {
+                    let request = this.getRequest(method, req);
+                    parent.send(request);
+                    parent.on('message', (message) =>{
+                        this.processHandlerResponse(method, req, res, message);
+                    });
+                }
+                else {
+                    this.sendHttpErrorUnsupportedType(res);
+                }
             }
             catch (error) {
                 this.sendErrorResponse(error);

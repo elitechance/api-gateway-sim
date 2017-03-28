@@ -17,6 +17,7 @@
     "src/api-gateway-sim.ts",
     "src/lib/callback.ts",
     "src/lib/handler.ts",
+    "src/lib/http-status.ts",
     "src/lib/aws/gateway/body-template.ts",
     "src/lib/aws/gateway/config.ts",
     "src/lib/aws/gateway/config/info.ts",

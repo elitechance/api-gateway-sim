@@ -1,5 +1,12 @@
 # Change log
 
+1.2.3
+* Support for integration type "aws_proxy"
+    - Set proper error message base on statusCode value
+    - Return Internal Server Error if unknown variables are set in response
+* Support for pass through behavior "when_no_match" and "never"
+* Support for route path in "context"
+
 1.2.2
 * AGS UI: Support `event` variable value parsing status 
 * Include transpiled js files for lib/aws/gateway/config**

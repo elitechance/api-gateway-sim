@@ -8,6 +8,7 @@ var cors = require("cors");
 var bodyParser = require("body-parser");
 var express = require("express");
 var body_template_1 = require("./lib/aws/gateway/body-template");
+var http_status_1 = require("./lib/http-status");
 var config_1 = require("./lib/aws/gateway/config");
 var methods_1 = require("./lib/aws/gateway/config/methods");
 var ApiGatewaySim = (function () {
@@ -141,18 +142,40 @@ var ApiGatewaySim = (function () {
         var query = url_parts.query;
         return query;
     };
+    ApiGatewaySim.prototype.getPassThroughTemplateContent = function () {
+        var file = __dirname + '/templates/pass-through.vtl';
+        return fs.readFileSync(file, 'utf8');
+    };
+    ApiGatewaySim.prototype.getPassThroughTemplate = function (type) {
+        switch (type) {
+            case 'when_no_match': return this.getPassThroughTemplateContent();
+            case 'never': return "";
+            default: return this.getPassThroughTemplateContent();
+        }
+    };
     ApiGatewaySim.prototype.getRequestTemplate = function (method, contentType) {
+        var templateValue = '';
         for (var index in method.integration.requestTemplates) {
             var template = method.integration.requestTemplates[index];
             if (template.contentType == contentType) {
-                return template.template;
+                templateValue = template.template;
             }
         }
-        return "";
+        if (!templateValue && method.canConsume(contentType)) {
+            return this.getPassThroughTemplateContent();
+        }
+        if (!templateValue) {
+            return this.getPassThroughTemplate(method.integration.passthroughBehavior);
+        }
+    };
+    ApiGatewaySim.prototype.setHttpRequestContext = function (context, request) {
+        context.httpMethod = request.method;
+        context.resourcePath = request.path;
     };
     ApiGatewaySim.prototype.parseEvent = function (method, request) {
         var bodyTemplate = new body_template_1.default();
         bodyTemplate.context = this.getContextJson();
+        this.setHttpRequestContext(bodyTemplate.context, request);
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -223,29 +246,6 @@ var ApiGatewaySim = (function () {
         }
         return null;
     };
-    ApiGatewaySim.prototype.getIntegrationResponseByErrorMessage = function (method, errorMessage) {
-        var regularExpress;
-        var defaultResponse;
-        for (var index in method.integration.responses) {
-            var response = method.integration.responses[index];
-            if (response.pattern == 'default') {
-                defaultResponse = response;
-            }
-            regularExpress = new RegExp(response.pattern);
-            if (errorMessage.match(regularExpress)) {
-                return response;
-            }
-        }
-        return defaultResponse;
-    };
-    ApiGatewaySim.prototype.getDefaultIntegrationResponse = function (method) {
-        for (var index in method.integration.responses) {
-            var response = method.integration.responses[index];
-            if (response.pattern == 'default') {
-                return response;
-            }
-        }
-    };
     ApiGatewaySim.prototype.setHeadersByIntegrationResponse = function (integrationResponse, method, httpResponse) {
         var methodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
         if (methodResponse == null) {
@@ -263,16 +263,75 @@ var ApiGatewaySim = (function () {
             }
         }
     };
+    ApiGatewaySim.prototype.sendHttpErrorResponse = function (httpResponse, message) {
+        httpResponse.send({ errorMessage: message });
+    };
+    ApiGatewaySim.prototype.sendHttpErrorBadGateway = function (httpResponse, message) {
+        httpResponse.statusMessage = http_status_1.default.getMessageByCode(502);
+        httpResponse.statusCode = 502;
+        httpResponse.send({ message: message });
+    };
+    ApiGatewaySim.prototype.sendHttpErrorUnsupportedType = function (httpResponse) {
+        var message = http_status_1.default.getMessageByCode(415);
+        httpResponse.statusMessage = message;
+        httpResponse.statusCode = 415;
+        httpResponse.send({ message: message });
+    };
+    ApiGatewaySim.prototype.validProxyProperties = function (message) {
+        var validProperties = { body: true, statusCode: true, headers: true };
+        for (var property in message) {
+            if (!validProperties[property]) {
+                return false;
+            }
+        }
+        return true;
+    };
+    ApiGatewaySim.prototype.sendAwsProxyResponse = function (httpResponse, method, message) {
+        var errorMessage = "Internal server error";
+        if (!message.body) {
+            return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
+        }
+        try {
+            var parseBody = JSON.parse(message.body);
+            if (!this.validProxyProperties(message)) {
+                return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
+            }
+            else {
+                if (message.statusCode) {
+                    httpResponse.statusCode = message.statusCode;
+                    httpResponse.statusMessage = http_status_1.default.getMessageByCode(message.statusCode);
+                }
+                this.sendDefaultResponse(httpResponse, method, parseBody);
+            }
+        }
+        catch (error) {
+            return this.sendHttpErrorBadGateway(httpResponse, error + "");
+        }
+    };
+    ApiGatewaySim.prototype.sendDefaultResponse = function (httpResponse, method, message) {
+        if (this._strictCors) {
+            this.setHeadersByIntegrationResponse(method.integration.defaultResponse, method, httpResponse);
+        }
+        httpResponse.send(message);
+    };
+    ApiGatewaySim.prototype.sendHttpSuccessResponse = function (httpResponse, method, message) {
+        switch (method.integration.type) {
+            case 'aws_proxy':
+                this.sendAwsProxyResponse(httpResponse, method, message);
+                break;
+            default: this.sendDefaultResponse(httpResponse, method, message);
+        }
+    };
     ApiGatewaySim.prototype.processHandlerResponse = function (method, httpRequest, httpResponse, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
-            httpResponse.send({ errorMessage: lambdaResponse.error });
+            this.sendHttpErrorResponse(httpResponse, lambdaResponse.error);
         }
         else if (lambdaResponse.timeout) {
-            httpResponse.send({ errorMessage: "Task timed out after " + this.getLambdaTimeout() + ".00 seconds" });
+            this.sendHttpErrorResponse(httpResponse, "Task timed out after " + this.getLambdaTimeout() + ".00 seconds");
         }
         else if (lambdaResponse.error) {
             var error = lambdaResponse.error;
-            var integrationResponse = this.getIntegrationResponseByErrorMessage(method, error.message);
+            var integrationResponse = method.integration.getResponseByErrorMessage(error.message);
             if (this._strictCors) {
                 this.setHeadersByIntegrationResponse(integrationResponse, method, httpResponse);
             }
@@ -281,10 +340,7 @@ var ApiGatewaySim = (function () {
         }
         else {
             if (httpRequest.method != 'HEAD') {
-                if (this._strictCors) {
-                    this.setHeadersByIntegrationResponse(this.getDefaultIntegrationResponse(method), method, httpResponse);
-                }
-                httpResponse.send(lambdaResponse.message);
+                this.sendHttpSuccessResponse(httpResponse, method, lambdaResponse.message);
             }
             else {
                 httpResponse.status(200).end();
@@ -313,6 +369,17 @@ var ApiGatewaySim = (function () {
         }
         return methodName;
     };
+    ApiGatewaySim.prototype.validRequest = function (method, httpRequest) {
+        var contentType = httpRequest.headers['content-type'];
+        if (!contentType) {
+            contentType = 'application/json';
+        }
+        var template = this.getRequestTemplate(method, contentType);
+        if (template) {
+            return true;
+        }
+        return false;
+    };
     ApiGatewaySim.prototype.configureRoutePathMethod = function (path, method) {
         var _this = this;
         var basePath = this.getBasePath();
@@ -324,11 +391,16 @@ var ApiGatewaySim = (function () {
                 _this._currentResponse = res;
                 var process_1 = require('child_process');
                 var parent_1 = process_1.fork(__dirname + '/lib/handler');
-                parent_1.on('message', function (message) {
-                    _this.processHandlerResponse(method, req, res, message);
-                });
-                var request = _this.getRequest(method, req);
-                parent_1.send(request);
+                if (_this.validRequest(method, req)) {
+                    var request = _this.getRequest(method, req);
+                    parent_1.send(request);
+                    parent_1.on('message', function (message) {
+                        _this.processHandlerResponse(method, req, res, message);
+                    });
+                }
+                else {
+                    _this.sendHttpErrorUnsupportedType(res);
+                }
             }
             catch (error) {
                 _this.sendErrorResponse(error);

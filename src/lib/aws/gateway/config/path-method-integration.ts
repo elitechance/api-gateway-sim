@@ -14,6 +14,36 @@ export default class PathMethodIntegration {
     private _contentHandling:string;
     private _type:string;
 
+    get defaultResponse(): PathMethodIntegrationResponse {
+        let responses = this.responses;
+
+        if (!responses) return null;
+
+        let response:PathMethodIntegrationResponse;
+        for (let index in responses) {
+            response = responses[index];
+            if (response.pattern == 'default') {
+                return response;
+            }
+        }
+
+        return null;
+    }
+
+    public getResponseByErrorMessage(errorMessage:string):PathMethodIntegrationResponse {
+        let regularExpress:RegExp;
+        let defaultResponse;
+        for(let index in this.responses) {
+            let response = this.responses[index];
+            if (response.pattern == 'default') { defaultResponse = response; }
+            regularExpress = new RegExp(response.pattern);
+            if (errorMessage.match(regularExpress)) {
+                return response;
+            }
+        }
+        return defaultResponse;
+    }
+
     get responses(): Array<PathMethodIntegrationResponse> {
         return this._responses;
     }
