@@ -159,6 +159,9 @@ var ApiGatewaySim = (function () {
             var template = method.integration.requestTemplates[index];
             if (template.contentType == contentType) {
                 templateValue = template.template;
+                if (templateValue) {
+                    return templateValue;
+                }
             }
         }
         if (!templateValue && method.canConsume(contentType)) {

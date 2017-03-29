@@ -190,13 +190,15 @@ class ApiGatewaySim {
             let template:PathMethodIntegrationResponseRequestTemplate = method.integration.requestTemplates[index];
             if (template.contentType == contentType) {
                 templateValue = template.template;
+                if (templateValue) {
+                    return templateValue;
+                }
             }
         }
 
         if (!templateValue && method.canConsume(contentType)) {
             return this.getPassThroughTemplateContent();
         }
-
         if (!templateValue) {
             return this.getPassThroughTemplate(method.integration.passthroughBehavior);
         }
