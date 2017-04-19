@@ -1,5 +1,9 @@
 # Change log
 
+1.2.4
+* Refactor Config class to OpenApi
+* Support for custom header in {proxy+}
+
 1.2.3
 * Support for integration type "aws_proxy"
     - Set proper error message base on statusCode value

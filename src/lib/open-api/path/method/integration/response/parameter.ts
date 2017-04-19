@@ -2,7 +2,7 @@
  * Created by EGomez on 3/15/17.
  */
 
-export default class PathMethodIntegrationResponseParameter {
+export default class Parameter {
     private _header:string;
     private _value:string;
 

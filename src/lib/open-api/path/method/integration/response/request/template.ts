@@ -1,9 +1,9 @@
-import PathMethodResponses from "./path-method-response";
+import PathMethodResponses from "../../../response";
 /**
  * Created by EGomez on 3/15/17.
  */
 
-export default class PathMethodIntegrationResponseRequestTemplate {
+export default class Template {
     private _contentType:string;
     private _template:string;
 

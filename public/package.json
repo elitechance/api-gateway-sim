@@ -35,6 +35,7 @@
     "angular-in-memory-web-api": "~0.2.4",
     "codemirror-minified": "^5.24.2",
     "core-js": "^2.4.1",
+    "js-yaml": "^3.8.3",
     "rxjs": "5.0.1",
     "systemjs": "0.19.40",
     "zone.js": "^0.7.4"

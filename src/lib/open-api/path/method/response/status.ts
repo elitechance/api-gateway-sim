@@ -1,21 +1,19 @@
-import PathMethodResponseStatus from "./path-method-response-status";
 /**
  * Created by EGomez on 3/15/17.
  */
 
-export default class PathMethodResponse {
-    private _statusCode:number;
+export default class Status {
+    private _status:number;
     private _description:string;
     private _schema:string;
-    private _headers:Array<string> = [];
+    private _headers:Array<string>;
 
-
-    get statusCode(): number {
-        return this._statusCode;
+    get status(): number {
+        return this._status;
     }
 
-    set statusCode(value: number) {
-        this._statusCode = value;
+    set status(value: number) {
+        this._status = value;
     }
 
     get description(): string {

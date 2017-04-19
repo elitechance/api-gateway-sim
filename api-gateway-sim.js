@@ -9,13 +9,13 @@ var bodyParser = require("body-parser");
 var express = require("express");
 var body_template_1 = require("./lib/aws/gateway/body-template");
 var http_status_1 = require("./lib/http-status");
-var config_1 = require("./lib/aws/gateway/config");
-var methods_1 = require("./lib/aws/gateway/config/methods");
+var open_api_1 = require("./lib/open-api/open-api");
+var methods_1 = require("./lib/open-api/methods");
 var ApiGatewaySim = (function () {
     function ApiGatewaySim() {
         this._gatewayServer = express();
         this._bodyTemplateServer = express();
-        this._apiGatewayConfig = new config_1.default();
+        this._openApiConfig = new open_api_1.default();
         this._strictCors = false;
         this.loadLocalPackageJson();
         this.initCommander();
@@ -25,7 +25,7 @@ var ApiGatewaySim = (function () {
         commander
             .version(this._localPackageJson.version)
             .option('-i, --timeout <lambda timeout>', 'Default is 3 seconds')
-            .option('-s, --swagger <file>', 'Swagger config file')
+            .option('-s, --swagger <file>', 'OpenApi/Swagger config file')
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
@@ -173,7 +173,10 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.setHttpRequestContext = function (context, request) {
         context.httpMethod = request.method;
-        context.resourcePath = request.path;
+        var stringPattern = '^' + this._openApiConfig.basePath + '';
+        var pattern = new RegExp(stringPattern);
+        var path = request.path.replace(pattern, '');
+        context.resourcePath = path;
     };
     ApiGatewaySim.prototype.parseEvent = function (method, request) {
         var bodyTemplate = new body_template_1.default();
@@ -289,13 +292,34 @@ var ApiGatewaySim = (function () {
         }
         return true;
     };
+    ApiGatewaySim.prototype.getAwsProxyContentType = function (message) {
+        if (!message.headers) {
+            return null;
+        }
+        for (var header in message.headers) {
+            if (header.match(/^content-type/i)) {
+                return message.headers[header];
+            }
+        }
+    };
     ApiGatewaySim.prototype.sendAwsProxyResponse = function (httpResponse, method, message) {
         var errorMessage = "Internal server error";
         if (!message.body) {
             return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
         }
         try {
-            var parseBody = JSON.parse(message.body);
+            var contentType = this.getAwsProxyContentType(message);
+            var parseBody = void 0;
+            if (contentType) {
+                httpResponse.setHeader('content-type', contentType);
+            }
+            if (contentType && !contentType.match(/^application\/json/)) {
+                parseBody = message.body;
+            }
+            else {
+                httpResponse.setHeader('content-type', 'application/json');
+                parseBody = JSON.parse(message.body);
+            }
             if (!this.validProxyProperties(message)) {
                 return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
             }
@@ -354,7 +378,7 @@ var ApiGatewaySim = (function () {
         var basePath = '';
         var withBasePath = commander['withBasepath'];
         if (withBasePath) {
-            basePath = this._apiGatewayConfig.basePath;
+            basePath = this._openApiConfig.basePath;
         }
         return basePath;
     };
@@ -386,9 +410,9 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.configureRoutePathMethod = function (path, method) {
         var _this = this;
         var basePath = this.getBasePath();
-        var expressPath = this.replacePathParams(basePath + path.value);
+        var expressPath = this.replacePathParams(basePath + path.pattern);
         var expressMethod = this.getExpressMethod(method.name);
-        this.logInfo("Add Route " + basePath + path.value + ", method " + expressMethod.toUpperCase());
+        this.logInfo("Add Route " + basePath + path.pattern + ", method " + expressMethod.toUpperCase());
         this._gatewayServer[expressMethod](expressPath, function (req, res) {
             try {
                 _this._currentResponse = res;
@@ -416,8 +440,8 @@ var ApiGatewaySim = (function () {
         }
     };
     ApiGatewaySim.prototype.configureRoutes = function () {
-        for (var index in this._apiGatewayConfig.paths) {
-            this.configureRoutePath(this._apiGatewayConfig.paths[index]);
+        for (var index in this._openApiConfig.paths) {
+            this.configureRoutePath(this._openApiConfig.paths[index]);
         }
     };
     ApiGatewaySim.prototype.runServer = function () {
@@ -507,8 +531,9 @@ var ApiGatewaySim = (function () {
         }
     };
     ApiGatewaySim.prototype.loadApiConfig = function () {
-        this._apiGatewayConfig.loadFile(this._swaggerFile);
+        this._openApiConfig.loadFile(this._swaggerFile);
     };
     return ApiGatewaySim;
 }());
 var apiGatewaySim = new ApiGatewaySim();
+//# sourceMappingURL=api-gateway-sim.js.map

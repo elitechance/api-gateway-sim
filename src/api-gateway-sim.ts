@@ -14,13 +14,13 @@ import Response = express.Response;
 import BodyTemplate from "./lib/aws/gateway/body-template";
 import Yaml = require('js-yaml');
 import HttpStatus from "./lib/http-status";
-import Config from "./lib/aws/gateway/config";
-import Path from "./lib/aws/gateway/config/path";
-import PathMethod from "./lib/aws/gateway/config/path-method";
-import ConfigMethods from "./lib/aws/gateway/config/methods";
-import PathMethodIntegrationResponse from "./lib/aws/gateway/config/path-method-integration-response";
-import PathMethodResponse from "./lib/aws/gateway/config/path-method-response";
-import PathMethodIntegrationResponseRequestTemplate from "./lib/aws/gateway/config/path-method-integration-response-request-template";
+import OpenApi from "./lib/open-api/open-api";
+import Path from "./lib/open-api/path";
+import Method from "./lib/open-api/path/method";
+import Methods from "./lib/open-api/methods";
+import IntegrationResponse from "./lib/open-api/path/method/integration/response";
+import MethodResponse from "./lib/open-api/path/method/response";
+import RequestTemplate from "./lib/open-api/path/method/integration/response/request/template";
 
 class ApiGatewaySim {
     private _packageJson;
@@ -29,7 +29,7 @@ class ApiGatewaySim {
     private _bodyTemplateServer = express();
     private _swaggerFile:string;
     private _currentResponse;
-    private _apiGatewayConfig:Config = new Config();
+    private _openApiConfig:OpenApi = new OpenApi();
     private _strictCors:boolean = false;
 
     constructor() {
@@ -42,7 +42,7 @@ class ApiGatewaySim {
         commander
             .version(this._localPackageJson.version)
             .option('-i, --timeout <lambda timeout>', 'Default is 3 seconds')
-            .option('-s, --swagger <file>', 'Swagger config file')
+            .option('-s, --swagger <file>', 'OpenApi/Swagger config file')
             .option('-e, --event <file>', 'Default file event.json')
             .option('-c, --context <file>', 'Default file context.json file')
             .option('-t, --stage-variables <file>', 'Default file stage-variables.json file')
@@ -184,10 +184,10 @@ class ApiGatewaySim {
         }
     }
 
-    private getRequestTemplate(method:PathMethod, contentType:string):string {
+    private getRequestTemplate(method:Method, contentType:string):string {
         let templateValue:string = '';
         for (let index in method.integration.requestTemplates) {
-            let template:PathMethodIntegrationResponseRequestTemplate = method.integration.requestTemplates[index];
+            let template:RequestTemplate = method.integration.requestTemplates[index];
             if (template.contentType == contentType) {
                 templateValue = template.template;
                 if (templateValue) {
@@ -206,10 +206,13 @@ class ApiGatewaySim {
 
     private setHttpRequestContext(context:any, request:Request) {
         context.httpMethod = request.method;
-        context.resourcePath = request.path;
+        let stringPattern = '^'+this._openApiConfig.basePath+'';
+        let pattern = new RegExp(stringPattern);
+        let path = request.path.replace(pattern, '');
+        context.resourcePath = path;
     }
 
-    private parseEvent(method:PathMethod, request:Request) {
+    private parseEvent(method:Method, request:Request) {
         let bodyTemplate = new BodyTemplate();
         bodyTemplate.context = this.getContextJson();
         this.setHttpRequestContext(bodyTemplate.context, request);
@@ -242,7 +245,7 @@ class ApiGatewaySim {
 
     private getAwsMethod(method:string) {
         if (method === 'all') {
-            return ConfigMethods.ANY;
+            return Methods.ANY;
         }
         return method;
     }
@@ -255,7 +258,7 @@ class ApiGatewaySim {
         }
     }
 
-    private getRequest(method:PathMethod, request:Request) {
+    private getRequest(method:Method, request:Request) {
         let jsonEncodedEvent = this.parseEvent(method, request);
         let event;
         let eventJson;
@@ -276,7 +279,7 @@ class ApiGatewaySim {
         };
     }
 
-    private getMethodResponseByStatusCode(method:PathMethod, statusCode:number):PathMethodResponse {
+    private getMethodResponseByStatusCode(method:Method, statusCode:number):MethodResponse {
         for(let index in method.responses) {
             let response = method.responses[index];
             if (response.statusCode == statusCode) {
@@ -286,8 +289,8 @@ class ApiGatewaySim {
         return null;
     }
 
-    private setHeadersByIntegrationResponse(integrationResponse:PathMethodIntegrationResponse, method:PathMethod, httpResponse:Response) {
-        let methodResponse:PathMethodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
+    private setHeadersByIntegrationResponse(integrationResponse:IntegrationResponse, method:Method, httpResponse:Response) {
+        let methodResponse:MethodResponse = this.getMethodResponseByStatusCode(method, integrationResponse.statusCode);
         if (methodResponse == null) {return;}
         for(let headerIndex in methodResponse.headers) {
             for (let responseParameterIndex in integrationResponse.responseParameters) {
@@ -329,13 +332,31 @@ class ApiGatewaySim {
         return true;
     }
 
-    private sendAwsProxyResponse(httpResponse:Response, method:PathMethod, message:any) {
+    private getAwsProxyContentType(message) {
+        if (!message.headers) { return null; }
+        for(let header in message.headers) {
+            if (header.match(/^content-type/i)) {
+                return message.headers[header];
+            }
+        }
+    }
+
+    private sendAwsProxyResponse(httpResponse:Response, method:Method, message:any) {
         let errorMessage = "Internal server error";
         if (!message.body) {
             return this.sendHttpErrorBadGateway(httpResponse, errorMessage)
         }
         try {
-            let parseBody = JSON.parse(message.body);
+            let contentType = this.getAwsProxyContentType(message);
+            let parseBody;
+            if (contentType) { httpResponse.setHeader('content-type', contentType); }
+            if (contentType && !contentType.match(/^application\/json/)) {
+                parseBody = message.body;
+            }
+            else {
+                httpResponse.setHeader('content-type', 'application/json');
+                parseBody = JSON.parse(message.body);
+            }
             if(!this.validProxyProperties(message)) {
                 return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
             }
@@ -352,21 +373,21 @@ class ApiGatewaySim {
         }
     }
 
-    private sendDefaultResponse(httpResponse:Response, method:PathMethod, message:any) {
+    private sendDefaultResponse(httpResponse:Response, method:Method, message:any) {
         if (this._strictCors) {
             this.setHeadersByIntegrationResponse(method.integration.defaultResponse, method, httpResponse);
         }
         httpResponse.send(message);
     }
 
-    private sendHttpSuccessResponse(httpResponse:Response, method:PathMethod, message:any) {
+    private sendHttpSuccessResponse(httpResponse:Response, method:Method, message:any) {
         switch (method.integration.type) {
             case 'aws_proxy': this.sendAwsProxyResponse(httpResponse, method, message); break;
             default: this.sendDefaultResponse(httpResponse, method, message);
         }
     }
 
-    private processHandlerResponse(method:PathMethod, httpRequest:Request, httpResponse:Response, lambdaResponse) {
+    private processHandlerResponse(method:Method, httpRequest:Request, httpResponse:Response, lambdaResponse) {
         if (lambdaResponse.lambdaError) {
             this.sendHttpErrorResponse(httpResponse, lambdaResponse.error);
         }
@@ -397,7 +418,7 @@ class ApiGatewaySim {
 
         let withBasePath = commander['withBasepath'];
         if (withBasePath) {
-            basePath = this._apiGatewayConfig.basePath;
+            basePath = this._openApiConfig.basePath;
         }
         return basePath;
     }
@@ -410,13 +431,13 @@ class ApiGatewaySim {
     }
 
     private getExpressMethod(methodName:string) {
-        if (methodName == ConfigMethods.ANY) {
+        if (methodName == Methods.ANY) {
             return 'all';
         }
         return methodName;
     }
 
-    private validRequest(method:PathMethod, httpRequest:Request) {
+    private validRequest(method:Method, httpRequest:Request) {
         let contentType = httpRequest.headers['content-type'];
         if (!contentType) { contentType = 'application/json'; }
         let template = this.getRequestTemplate(method, contentType);
@@ -426,11 +447,11 @@ class ApiGatewaySim {
         return false;
     }
 
-    private configureRoutePathMethod(path:Path, method:PathMethod) {
+    private configureRoutePathMethod(path:Path, method:Method) {
         let basePath = this.getBasePath();
-        let expressPath = this.replacePathParams(basePath+path.value);
+        let expressPath = this.replacePathParams(basePath+path.pattern);
         let expressMethod = this.getExpressMethod(method.name);
-        this.logInfo("Add Route "+basePath+path.value+", method "+expressMethod.toUpperCase());
+        this.logInfo("Add Route "+basePath+path.pattern+", method "+expressMethod.toUpperCase());
         this._gatewayServer[expressMethod](expressPath, (req, res) => {
             try {
                 this._currentResponse = res;
@@ -460,8 +481,8 @@ class ApiGatewaySim {
     }
 
     private configureRoutes() {
-        for(let index in this._apiGatewayConfig.paths) {
-            this.configureRoutePath(this._apiGatewayConfig.paths[index]);
+        for(let index in this._openApiConfig.paths) {
+            this.configureRoutePath(this._openApiConfig.paths[index]);
         }
     }
 
@@ -546,7 +567,7 @@ class ApiGatewaySim {
     }
 
     private loadApiConfig() {
-        this._apiGatewayConfig.loadFile(this._swaggerFile);
+        this._openApiConfig.loadFile(this._swaggerFile);
     }
 
 }

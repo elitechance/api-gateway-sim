@@ -2,10 +2,10 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodResponse from "./path-method-response";
-import PathMethodIntegration from "./path-method-integration";
+import PathMethodResponse from "./method/response";
+import PathMethodIntegration from "./method/integration";
 
-export default class PathMethod {
+export default class Method {
     private _name:string;
     private _consumes:Array<string>;
     private _produces:Array<string>;

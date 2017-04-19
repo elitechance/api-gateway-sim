@@ -2,7 +2,7 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethod from "./path-method";
+import PathMethod from "./path/method";
 
 export default class ConfigInfo {
     private _version:string;

@@ -5,31 +5,33 @@
 
 import Yaml = require('js-yaml');
 import fs = require('fs');
-import Path from "./config/path";
-import PathMethod from "./config/path-method";
-import PathMethodResponse from "./config/path-method-response";
-import PathMethodIntegration from "./config/path-method-integration";
-import PathMethodIntegrationResponse from "./config/path-method-integration-response";
-import PathMethodIntegrationResponseParameter from "./config/path-method-integration-response-parameter";
-import PathMethodIntegrationResponseRequestTemplate from "./config/path-method-integration-response-request-template";
-import ConfigInfo from "./config/info";
+import Path from "./path";
+import Method from "./path/method";
+import Response from "./path/method/response";
+import Integration from "./path/method/integration";
+import IntegrationResponse from "./path/method/integration/response";
+import Parameter from "./path/method/integration/response/parameter";
+import Template from "./path/method/integration/response/request/template";
+import Info from "./info";
 
-export default class Config {
+export default class OpenApi {
     private _file:string;
     private _jsonConfig:any;
     private _paths:Array<Path> = [];
     private _basePath:string;
     private _host:string;
     private _schemes:Array<string> = [];
-    private _info:ConfigInfo = new ConfigInfo();
-    private _swaggerVersion:string;
+    private _consumes:Array<string> = [];
+    private _produces:Array<string> = [];
+    private _info:Info = new Info();
+    private _swagger:string;
 
     private static throwError(message) {
         throw new Error(message);
     }
 
-    private parsePathMethodResponse(method:PathMethod, responseValue:string, response:any) {
-        let pathMethodResponse = new PathMethodResponse();
+    private parsePathMethodResponse(method:Method, responseValue:string, response:any) {
+        let pathMethodResponse = new Response();
         pathMethodResponse.statusCode = parseInt(responseValue);
         pathMethodResponse.description = response.description;
         pathMethodResponse.schema = response.schema;
@@ -39,12 +41,12 @@ export default class Config {
         method.responses.push(pathMethodResponse);
     }
 
-    private parsePathMethodIntegrationResponse(responses:Array<PathMethodIntegrationResponse>, pattern:string, response:any) {
-        let classResponse:PathMethodIntegrationResponse = new PathMethodIntegrationResponse();
+    private parsePathMethodIntegrationResponse(responses:Array<IntegrationResponse>, pattern:string, response:any) {
+        let classResponse:IntegrationResponse = new IntegrationResponse();
         classResponse.pattern = pattern;
         classResponse.statusCode = parseInt(response['statusCode']);
         for (let responseParameter in response.responseParameters) {
-            let classResponseParameter:PathMethodIntegrationResponseParameter = new PathMethodIntegrationResponseParameter();
+            let classResponseParameter:Parameter = new Parameter();
             classResponseParameter.header = responseParameter;
             classResponseParameter.value = response.responseParameters[responseParameter];
             classResponse.responseParameters.push(classResponseParameter);
@@ -52,7 +54,7 @@ export default class Config {
         responses.push(classResponse);
     }
 
-    private parsePathMethodIntegration(classIntegration:PathMethodIntegration, integration:any) {
+    private parsePathMethodIntegration(classIntegration:Integration, integration:any) {
         classIntegration.passthroughBehavior = integration.passthroughBehavior;
         classIntegration.type = integration.type;
         classIntegration.httpMethod = integration.httpMethod;
@@ -64,7 +66,7 @@ export default class Config {
         }
 
         for(let contentType in integration.requestTemplates) {
-            let classRequestTemplate = new PathMethodIntegrationResponseRequestTemplate();
+            let classRequestTemplate = new Template();
             classRequestTemplate.contentType = contentType;
             classRequestTemplate.template = integration.requestTemplates[contentType];
             classIntegration.requestTemplates.push(classRequestTemplate);
@@ -72,7 +74,7 @@ export default class Config {
     }
 
     private parsePathMethod(path:Path, methodName:string, method:any) {
-        let classMethod = new PathMethod();
+        let classMethod = new Method();
         classMethod.name = methodName;
         classMethod.consumes = method.consumes;
         classMethod.produces = method.produces;
@@ -80,14 +82,14 @@ export default class Config {
         for(let response in method.responses) {
             this.parsePathMethodResponse(classMethod, response, method.responses[response]);
         }
-        classMethod.integration = new PathMethodIntegration();
+        classMethod.integration = new Integration();
         this.parsePathMethodIntegration(classMethod.integration, method['x-amazon-apigateway-integration']);
     }
 
     private parsePath(path:any) {
         let pathObject = this.jsonConfig['paths'][path];
         let configPath = new Path();
-        configPath.value = path;
+        configPath.pattern = path;
         for(let method in pathObject) {
             this.parsePathMethod(configPath, method, this.jsonConfig['paths'][path][method]);
         }
@@ -98,7 +100,7 @@ export default class Config {
         this.basePath = this.jsonConfig['basePath'];
         this.schemes = this.jsonConfig['schemes'];
         this.host = this.jsonConfig['host'];
-        this.swaggerVersion = this.jsonConfig['swagger'];
+        this.swagger = this.jsonConfig['swagger'];
 
         if (this.jsonConfig['info']) {
             this.info.version = this.jsonConfig['info'].version;
@@ -110,6 +112,16 @@ export default class Config {
         }
     }
 
+    loadFromJsonString(jsonString:string) {
+        this.jsonConfig = JSON.parse(jsonString);
+        this.parseJsonConfig();
+    }
+
+    loadFromYamlString(yamlString:string) {
+        this.jsonConfig = Yaml.safeLoad(yamlString);
+        this.parseJsonConfig();
+    }
+
     loadFile(file:string) {
         this.file = file;
         try {
@@ -118,18 +130,18 @@ export default class Config {
                 this.jsonConfig = JSON.parse(configJson);
             }
             else if (file.match(/\.yaml$/)) {
-                let configJson = fs.readFileSync(file, 'utf8');
-                this.jsonConfig = Yaml.safeLoad(configJson);
+                let configYaml = fs.readFileSync(file, 'utf8');
+                this.jsonConfig = Yaml.safeLoad(configYaml);
             }
             else if (file.match(/\.yml$/)) {
-                let configJson = fs.readFileSync(file, 'utf8');
-                this.jsonConfig = Yaml.safeLoad(configJson);
+                let configYml = fs.readFileSync(file, 'utf8');
+                this.jsonConfig = Yaml.safeLoad(configYml);
             }
-            if (!this.jsonConfig) { Config.throwError("Unable to open config file "+file); }
+            if (!this.jsonConfig) { OpenApi.throwError("Unable to open config file "+file); }
             this.parseJsonConfig();
         }
         catch (error) {
-            Config.throwError("Unable to open swagger file "+this.file+"\nError: "+JSON.stringify(error));
+            OpenApi.throwError("Unable to open swagger file "+this.file+"\nError: "+JSON.stringify(error));
         }
     }
 
@@ -177,19 +189,35 @@ export default class Config {
         this._schemes = value;
     }
 
-    get info(): ConfigInfo {
+    get info(): Info {
         return this._info;
     }
 
-    set info(value: ConfigInfo) {
+    set info(value: Info) {
         this._info = value;
     }
 
-    get swaggerVersion(): string {
-        return this._swaggerVersion;
+    get swagger(): string {
+        return this._swagger;
     }
 
-    set swaggerVersion(value: string) {
-        this._swaggerVersion = value;
+    set swagger(value: string) {
+        this._swagger = value;
+    }
+
+    get consumes(): Array<string> {
+        return this._consumes;
+    }
+
+    set consumes(value: Array<string>) {
+        this._consumes = value;
+    }
+
+    get produces(): Array<string> {
+        return this._produces;
+    }
+
+    set produces(value: Array<string>) {
+        this._produces = value;
     }
 }

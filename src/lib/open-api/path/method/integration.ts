@@ -2,10 +2,10 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodIntegrationResponse from "./path-method-integration-response";
-import PathMethodIntegrationResponseRequestTemplate from "./path-method-integration-response-request-template";
+import PathMethodIntegrationResponse from "./integration/response";
+import PathMethodIntegrationResponseRequestTemplate from "./integration/response/request/template";
 
-export default class PathMethodIntegration {
+export default class Integration {
     private _responses:Array<PathMethodIntegrationResponse> = [];
     private _requestTemplates:Array<PathMethodIntegrationResponseRequestTemplate> = [];
     private _uri:string;

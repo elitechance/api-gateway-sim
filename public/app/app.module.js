@@ -9,6 +9,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var core_1 = require("@angular/core");
 var platform_browser_1 = require("@angular/platform-browser");
 var app_component_1 = require("./app.component");
+var body_mapping_parser_component_1 = require("./body-mapping-parser/body-mapping-parser.component");
+var api_manager_component_1 = require("./api-manager/api-manager.component");
 var http_1 = require("@angular/http");
 var AppModule = (function () {
     function AppModule() {
@@ -18,7 +20,7 @@ var AppModule = (function () {
 AppModule = __decorate([
     core_1.NgModule({
         imports: [platform_browser_1.BrowserModule, http_1.HttpModule],
-        declarations: [app_component_1.AppComponent],
+        declarations: [app_component_1.AppComponent, body_mapping_parser_component_1.BodyMappingParserComponent, api_manager_component_1.ApiManagerComponent],
         bootstrap: [app_component_1.AppComponent]
     })
 ], AppModule);

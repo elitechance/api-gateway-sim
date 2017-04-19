@@ -2,9 +2,9 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodIntegrationResponseParameter from "./path-method-integration-response-parameter";
+import PathMethodIntegrationResponseParameter from "./response/parameter";
 
-export default class PathMethodIntegrationResponse {
+export default class Response {
     private _pattern:string;
     private _statusCode:number;
     private _responseParameters:Array<PathMethodIntegrationResponseParameter> = [];
