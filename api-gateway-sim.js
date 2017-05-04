@@ -173,10 +173,18 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.setHttpRequestContext = function (context, request) {
         context.httpMethod = request.method;
-        var stringPattern = '^' + this._openApiConfig.basePath + '';
-        var pattern = new RegExp(stringPattern);
-        var path = request.path.replace(pattern, '');
-        context.resourcePath = path;
+        /**
+         * In API Gateway, base path is not part of path when passing it to lambda.
+         */
+        if (this.getBasePath()) {
+            var stringPattern = '^' + this._openApiConfig.basePath + '';
+            var pattern = new RegExp(stringPattern);
+            var path_1 = request.path.replace(pattern, '');
+            context.resourcePath = path_1;
+        }
+        else {
+            context.resourcePath = request.path;
+        }
     };
     ApiGatewaySim.prototype.parseEvent = function (method, request) {
         var bodyTemplate = new body_template_1.default();
@@ -235,10 +243,12 @@ var ApiGatewaySim = (function () {
         else {
             eventJson = this.getEventJson();
         }
+        var context = this.getContextJson();
+        this.setHttpRequestContext(context, request);
         return {
             eventJson: eventJson,
             packageJson: this._packageJson,
-            contextJson: this.getContextJson(),
+            contextJson: context,
             stageVariables: this.getStageVariables(),
             lambdaTimeout: this.getLambdaTimeout()
         };

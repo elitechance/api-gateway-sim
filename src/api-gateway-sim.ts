@@ -206,10 +206,18 @@ class ApiGatewaySim {
 
     private setHttpRequestContext(context:any, request:Request) {
         context.httpMethod = request.method;
-        let stringPattern = '^'+this._openApiConfig.basePath+'';
-        let pattern = new RegExp(stringPattern);
-        let path = request.path.replace(pattern, '');
-        context.resourcePath = path;
+        /**
+         * In API Gateway, base path is not part of path when passing it to lambda.
+         */
+        if (this.getBasePath()) {
+            let stringPattern = '^'+this._openApiConfig.basePath+'';
+            let pattern = new RegExp(stringPattern);
+            let path = request.path.replace(pattern, '');
+            context.resourcePath = path;
+        }
+        else {
+            context.resourcePath = request.path;
+        }
     }
 
     private parseEvent(method:Method, request:Request) {
@@ -269,11 +277,13 @@ class ApiGatewaySim {
         else {
             eventJson = this.getEventJson();
         }
+        let context = this.getContextJson();
+        this.setHttpRequestContext(context, request);
 
         return {
             eventJson:eventJson,
             packageJson:this._packageJson,
-            contextJson:this.getContextJson(),
+            contextJson:context,
             stageVariables:this.getStageVariables(),
             lambdaTimeout:this.getLambdaTimeout()
         };

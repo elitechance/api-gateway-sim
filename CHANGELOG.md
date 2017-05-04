@@ -1,5 +1,9 @@
 # Change log
 
+1.2.6
+* Fix base path pattern to only remove when it's enabled in command line
+* Fix lambda context content merging
+
 1.2.4
 * Refactor Config class to OpenApi
 * Support for custom header in {proxy+}
