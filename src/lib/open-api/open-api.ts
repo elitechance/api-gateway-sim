@@ -55,6 +55,7 @@ export default class OpenApi {
     }
 
     private parsePathMethodIntegration(classIntegration:Integration, integration:any) {
+        if (!integration) { return; }
         classIntegration.passthroughBehavior = integration.passthroughBehavior;
         classIntegration.type = integration.type;
         classIntegration.httpMethod = integration.httpMethod;

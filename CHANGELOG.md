@@ -1,5 +1,8 @@
 # Change log
 
+1.2.7
+* Add null check on open api library
+
 1.2.6
 * Fix base path pattern to only remove when it's enabled in command line
 * Fix lambda context content merging
