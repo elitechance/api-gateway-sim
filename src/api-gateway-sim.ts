@@ -266,27 +266,61 @@ class ApiGatewaySim {
         }
     }
 
-    private getRequest(method:Method, request:Request) {
-        let jsonEncodedEvent = this.parseEvent(method, request);
-        let event;
-        let eventJson;
+    private mergeEventData(jsonEncodedEvent:any) {
         if (jsonEncodedEvent) {
-            event = JSON.parse(jsonEncodedEvent);
-            eventJson = Object['assign'](this.getEventJson(), event);
+            let event = JSON.parse(jsonEncodedEvent);
+            return Object['assign'](this.getEventJson(), event);
         }
         else {
-            eventJson = this.getEventJson();
+            return this.getEventJson();
         }
+    }
+
+    private getProxyName(path:Path) {
+        let pattern = path.pattern;
+        let match = pattern.match(/{[a-zA-Z]+\+}/);
+        if (match) {
+            let name = match[0];
+            return name.replace(/[{}+]/g,'');
+        }
+        return null;
+    }
+
+    private setProxyStageVariables(path:Path, event:any) {
+        if (!event.requestContext) {
+            event.requestContext = {};
+        }
+        event.requestContext.stage = this._openApiConfig.basePath.replace(/^\//, '');
+        event.requestContext.resourcePath = path.pattern;
+        event.requestContext.path = this._openApiConfig.basePath+event.path;
+    }
+
+    private processProxyData(path:Path, requestObject:any) {
+        let proxyName = this.getProxyName(path);
+        if (proxyName) {
+            let proxyValue = requestObject.eventJson.pathParameters['0'];
+            let pathParameters:any = {};
+            pathParameters[proxyName] = proxyValue;
+            requestObject.eventJson.pathParameters = pathParameters;
+            requestObject.eventJson.resource = path.pattern;
+            this.setProxyStageVariables(path, requestObject.eventJson);
+        }
+        return requestObject;
+    }
+
+    private getRequest(path:Path, method:Method, request:Request) {
+        let jsonEncodedEvent = this.parseEvent(method, request);
+        let eventJson = this.mergeEventData(jsonEncodedEvent);
         let context = this.getContextJson();
         this.setHttpRequestContext(context, request);
-
-        return {
+        let requestObject = {
             eventJson:eventJson,
             packageJson:this._packageJson,
             contextJson:context,
             stageVariables:this.getStageVariables(),
             lambdaTimeout:this.getLambdaTimeout()
         };
+        return this.processProxyData(path, requestObject);
     }
 
     private getMethodResponseByStatusCode(method:Method, statusCode:number):MethodResponse {
@@ -468,7 +502,7 @@ class ApiGatewaySim {
                 let process = require('child_process');
                 let parent = process.fork(__dirname+'/lib/handler');
                 if (this.validRequest(method, req)) {
-                    let request = this.getRequest(method, req);
+                    let request = this.getRequest(path, method, req);
                     parent.send(request);
                     parent.on('message', (message) =>{
                         this.processHandlerResponse(method, req, res, message);

@@ -232,26 +232,57 @@ var ApiGatewaySim = (function () {
             this._currentResponse.status(500).end();
         }
     };
-    ApiGatewaySim.prototype.getRequest = function (method, request) {
-        var jsonEncodedEvent = this.parseEvent(method, request);
-        var event;
-        var eventJson;
+    ApiGatewaySim.prototype.mergeEventData = function (jsonEncodedEvent) {
         if (jsonEncodedEvent) {
-            event = JSON.parse(jsonEncodedEvent);
-            eventJson = Object['assign'](this.getEventJson(), event);
+            var event_1 = JSON.parse(jsonEncodedEvent);
+            return Object['assign'](this.getEventJson(), event_1);
         }
         else {
-            eventJson = this.getEventJson();
+            return this.getEventJson();
         }
+    };
+    ApiGatewaySim.prototype.getProxyName = function (path) {
+        var pattern = path.pattern;
+        var match = pattern.match(/{[a-zA-Z]+\+}/);
+        if (match) {
+            var name_1 = match[0];
+            return name_1.replace(/[{}+]/g, '');
+        }
+        return null;
+    };
+    ApiGatewaySim.prototype.setProxyStageVariables = function (path, event) {
+        if (!event.requestContext) {
+            event.requestContext = {};
+        }
+        event.requestContext.stage = this._openApiConfig.basePath.replace(/^\//, '');
+        event.requestContext.resourcePath = path.pattern;
+        event.requestContext.path = this._openApiConfig.basePath + event.path;
+    };
+    ApiGatewaySim.prototype.processProxyData = function (path, requestObject) {
+        var proxyName = this.getProxyName(path);
+        if (proxyName) {
+            var proxyValue = requestObject.eventJson.pathParameters['0'];
+            var pathParameters = {};
+            pathParameters[proxyName] = proxyValue;
+            requestObject.eventJson.pathParameters = pathParameters;
+            requestObject.eventJson.resource = path.pattern;
+            this.setProxyStageVariables(path, requestObject.eventJson);
+        }
+        return requestObject;
+    };
+    ApiGatewaySim.prototype.getRequest = function (path, method, request) {
+        var jsonEncodedEvent = this.parseEvent(method, request);
+        var eventJson = this.mergeEventData(jsonEncodedEvent);
         var context = this.getContextJson();
         this.setHttpRequestContext(context, request);
-        return {
+        var requestObject = {
             eventJson: eventJson,
             packageJson: this._packageJson,
             contextJson: context,
             stageVariables: this.getStageVariables(),
             lambdaTimeout: this.getLambdaTimeout()
         };
+        return this.processProxyData(path, requestObject);
     };
     ApiGatewaySim.prototype.getMethodResponseByStatusCode = function (method, statusCode) {
         for (var index in method.responses) {
@@ -429,7 +460,7 @@ var ApiGatewaySim = (function () {
                 var process_1 = require('child_process');
                 var parent_1 = process_1.fork(__dirname + '/lib/handler');
                 if (_this.validRequest(method, req)) {
-                    var request = _this.getRequest(method, req);
+                    var request = _this.getRequest(path, method, req);
                     parent_1.send(request);
                     parent_1.on('message', function (message) {
                         _this.processHandlerResponse(method, req, res, message);

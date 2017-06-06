@@ -1,5 +1,10 @@
 # Change log
 
+1.2.8
+* Fix request template for {proxy+}
+* Support for custom proxy name
+* Support for requestContext for {proxy+}
+
 1.2.7
 * Add null check on open api library
 
