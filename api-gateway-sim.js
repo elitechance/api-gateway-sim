@@ -128,10 +128,11 @@ var ApiGatewaySim = (function () {
         else {
             this.logInfo("Using strict CORS");
         }
+        this._gatewayServer.use(bodyParser.text({ type: '*/*' }));
         // parse application/x-www-form-urlencoded
         this._gatewayServer.use(bodyParser.urlencoded({ extended: false }));
         // parse application/json
-        this._gatewayServer.use(bodyParser.json());
+        this._gatewayServer.use(bodyParser.json({ type: 'application/json' }));
     };
     ApiGatewaySim.prototype.logInfo = function (message) {
         console.log(message);
@@ -258,7 +259,15 @@ var ApiGatewaySim = (function () {
         event.requestContext.resourcePath = path.pattern;
         event.requestContext.path = this._openApiConfig.basePath + event.path;
     };
-    ApiGatewaySim.prototype.processProxyData = function (path, requestObject) {
+    ApiGatewaySim.prototype.getRequestBody = function (body) {
+        try {
+            return JSON.parse(body);
+        }
+        catch (error) {
+            return body;
+        }
+    };
+    ApiGatewaySim.prototype.processProxyData = function (path, request, requestObject) {
         var proxyName = this.getProxyName(path);
         if (proxyName) {
             var proxyValue = requestObject.eventJson.pathParameters['0'];
@@ -266,6 +275,7 @@ var ApiGatewaySim = (function () {
             pathParameters[proxyName] = proxyValue;
             requestObject.eventJson.pathParameters = pathParameters;
             requestObject.eventJson.resource = path.pattern;
+            requestObject.eventJson.body = this.getRequestBody(request.body);
             this.setProxyStageVariables(path, requestObject.eventJson);
         }
         return requestObject;
@@ -282,7 +292,7 @@ var ApiGatewaySim = (function () {
             stageVariables: this.getStageVariables(),
             lambdaTimeout: this.getLambdaTimeout()
         };
-        return this.processProxyData(path, requestObject);
+        return this.processProxyData(path, request, requestObject);
     };
     ApiGatewaySim.prototype.getMethodResponseByStatusCode = function (method, statusCode) {
         for (var index in method.responses) {
@@ -457,8 +467,8 @@ var ApiGatewaySim = (function () {
         this._gatewayServer[expressMethod](expressPath, function (req, res) {
             try {
                 _this._currentResponse = res;
-                var process_1 = require('child_process');
-                var parent_1 = process_1.fork(__dirname + '/lib/handler');
+                var childProcess = require('child_process');
+                var parent_1 = childProcess.fork(__dirname + '/lib/handler');
                 if (_this.validRequest(method, req)) {
                     var request = _this.getRequest(path, method, req);
                     parent_1.send(request);

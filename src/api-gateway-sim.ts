@@ -154,10 +154,11 @@ class ApiGatewaySim {
             this.logInfo("Using strict CORS");
         }
 
+        this._gatewayServer.use(bodyParser.text({type:'*/*'}));
         // parse application/x-www-form-urlencoded
         this._gatewayServer.use(bodyParser.urlencoded({ extended: false }));
         // parse application/json
-        this._gatewayServer.use(bodyParser.json())
+        this._gatewayServer.use(bodyParser.json({type:'application/json'}))
     }
 
     private logInfo(message) {
@@ -295,7 +296,16 @@ class ApiGatewaySim {
         event.requestContext.path = this._openApiConfig.basePath+event.path;
     }
 
-    private processProxyData(path:Path, requestObject:any) {
+    private getRequestBody(body:any) {
+        try {
+            return JSON.parse(body);
+        }
+        catch (error) {
+            return body;
+        }
+    }
+
+    private processProxyData(path:Path, request:Request, requestObject:any) {
         let proxyName = this.getProxyName(path);
         if (proxyName) {
             let proxyValue = requestObject.eventJson.pathParameters['0'];
@@ -303,6 +313,7 @@ class ApiGatewaySim {
             pathParameters[proxyName] = proxyValue;
             requestObject.eventJson.pathParameters = pathParameters;
             requestObject.eventJson.resource = path.pattern;
+            requestObject.eventJson.body = this.getRequestBody(request.body);
             this.setProxyStageVariables(path, requestObject.eventJson);
         }
         return requestObject;
@@ -320,7 +331,7 @@ class ApiGatewaySim {
             stageVariables:this.getStageVariables(),
             lambdaTimeout:this.getLambdaTimeout()
         };
-        return this.processProxyData(path, requestObject);
+        return this.processProxyData(path, request, requestObject);
     }
 
     private getMethodResponseByStatusCode(method:Method, statusCode:number):MethodResponse {
@@ -499,8 +510,8 @@ class ApiGatewaySim {
         this._gatewayServer[expressMethod](expressPath, (req, res) => {
             try {
                 this._currentResponse = res;
-                let process = require('child_process');
-                let parent = process.fork(__dirname+'/lib/handler');
+                let childProcess = require('child_process');
+                let parent = childProcess.fork(__dirname+'/lib/handler');
                 if (this.validRequest(method, req)) {
                     let request = this.getRequest(path, method, req);
                     parent.send(request);

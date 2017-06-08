@@ -1,5 +1,8 @@
 # Change log
 
+1.2.9
+* Add support for non json body content
+
 1.2.8
 * Fix request template for {proxy+}
 * Support for custom proxy name
