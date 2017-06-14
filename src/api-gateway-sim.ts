@@ -336,6 +336,16 @@ class ApiGatewaySim {
         }
     }
 
+    private getRawHeaders(request:Request) {
+        let rawHeaders = {};
+        if (request.rawHeaders.length > 0) {
+            for(let i = 0;i < request.rawHeaders.length;i+=2) {
+                rawHeaders[request.rawHeaders[i]] = request.rawHeaders[i+1];
+            }
+        }
+        return rawHeaders;
+    }
+
     private processProxyData(path:Path, request:Request, requestObject:any) {
         let proxyName = this.getProxyName(path);
         if (proxyName) {
@@ -346,6 +356,7 @@ class ApiGatewaySim {
             requestObject.eventJson.resource = path.pattern;
             requestObject.eventJson.body = request.body.toString();
             requestObject.eventJson.path = request.originalUrl.replace(this.getBasePath(), '');
+            requestObject.eventJson.headers = this.getRawHeaders(request);
             if (requestObject.eventJson.params) {
                 delete requestObject.eventJson.params;
             }

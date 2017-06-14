@@ -298,6 +298,15 @@ var ApiGatewaySim = (function () {
             return body;
         }
     };
+    ApiGatewaySim.prototype.getRawHeaders = function (request) {
+        var rawHeaders = {};
+        if (request.rawHeaders.length > 0) {
+            for (var i = 0; i < request.rawHeaders.length; i += 2) {
+                rawHeaders[request.rawHeaders[i]] = request.rawHeaders[i + 1];
+            }
+        }
+        return rawHeaders;
+    };
     ApiGatewaySim.prototype.processProxyData = function (path, request, requestObject) {
         var proxyName = this.getProxyName(path);
         if (proxyName) {
@@ -308,6 +317,7 @@ var ApiGatewaySim = (function () {
             requestObject.eventJson.resource = path.pattern;
             requestObject.eventJson.body = request.body.toString();
             requestObject.eventJson.path = request.originalUrl.replace(this.getBasePath(), '');
+            requestObject.eventJson.headers = this.getRawHeaders(request);
             if (requestObject.eventJson.params) {
                 delete requestObject.eventJson.params;
             }
