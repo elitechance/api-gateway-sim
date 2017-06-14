@@ -172,7 +172,37 @@ var ApiGatewaySim = (function () {
             return this.getPassThroughTemplate(method.integration.passthroughBehavior);
         }
     };
-    ApiGatewaySim.prototype.setHttpRequestContext = function (context, request) {
+    ApiGatewaySim.prototype.setContextValue = function (context, name) {
+        if (context[name]) {
+            return;
+        }
+        context[name] = '';
+    };
+    ApiGatewaySim.prototype.setContextValues = function (context, request) {
+        if (!context.identity) {
+            context.identity = {};
+        }
+        if (!context.authorizer) {
+            context.authorizer = { principalId: '' };
+        }
+        context.identity.userAgent = request.headers['user-agent'];
+        this.setContextValue(context.identity, 'accountId');
+        this.setContextValue(context.identity, 'apiKey');
+        this.setContextValue(context.identity, 'caller');
+        this.setContextValue(context.identity, 'cognitoAuthenticationProvider');
+        this.setContextValue(context.identity, 'cognitoAuthenticationType');
+        this.setContextValue(context.identity, 'cognitoIdentityId');
+        this.setContextValue(context.identity, 'cognitoIdentityPoolId');
+        this.setContextValue(context.identity, 'sourceIp');
+        this.setContextValue(context.identity, 'userAgent');
+        this.setContextValue(context.identity, 'userArn');
+        this.setContextValue(context.identity, 'user');
+        this.setContextValue(context, 'apiId');
+        this.setContextValue(context, 'requestId');
+        this.setContextValue(context, 'resourceId');
+        context.stage = this.getBasePath().replace(/^\//, '');
+    };
+    ApiGatewaySim.prototype.setContextDefaults = function (context, request) {
         context.httpMethod = request.method;
         /**
          * In API Gateway, base path is not part of path when passing it to lambda.
@@ -186,11 +216,12 @@ var ApiGatewaySim = (function () {
         else {
             context.resourcePath = request.path;
         }
+        this.setContextValues(context, request);
     };
     ApiGatewaySim.prototype.parseEvent = function (method, request) {
         var bodyTemplate = new body_template_1.default();
         bodyTemplate.context = this.getContextJson();
-        this.setHttpRequestContext(bodyTemplate.context, request);
+        this.setContextDefaults(bodyTemplate.context, request);
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -200,7 +231,7 @@ var ApiGatewaySim = (function () {
         }
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
-        bodyTemplate.payload = JSON.stringify(request.body);
+        bodyTemplate.payload = this.getRequestBody(JSON.stringify(request.body));
         bodyTemplate.stageVariables = this.getStageVariables();
         var contextType = request.headers['content-type'];
         if (!contextType) {
@@ -284,7 +315,6 @@ var ApiGatewaySim = (function () {
         var jsonEncodedEvent = this.parseEvent(method, request);
         var eventJson = this.mergeEventData(jsonEncodedEvent);
         var context = this.getContextJson();
-        this.setHttpRequestContext(context, request);
         var requestObject = {
             eventJson: eventJson,
             packageJson: this._packageJson,

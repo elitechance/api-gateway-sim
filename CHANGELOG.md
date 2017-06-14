@@ -1,5 +1,11 @@
 # Change log
 
+1.2.10
+* Update templates/pass-through.vtl
+* Support `context.user-agent`
+* Support for `context.stage`
+* Bug fix `$input.json('$')` parsing
+
 1.2.9
 * Add support for non json body content
 

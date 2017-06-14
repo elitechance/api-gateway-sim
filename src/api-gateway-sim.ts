@@ -205,7 +205,37 @@ class ApiGatewaySim {
         }
     }
 
-    private setHttpRequestContext(context:any, request:Request) {
+    private setContextValue(context:any, name:string) {
+        if (context[name]) { return; }
+        context[name] = '';
+    }
+
+    private setContextValues(context:any, request:Request) {
+        if (!context.identity) {
+            context.identity = {};
+        }
+        if (!context.authorizer) {
+            context.authorizer = {principalId:''};
+        }
+        context.identity.userAgent = request.headers['user-agent'];
+        this.setContextValue(context.identity, 'accountId');
+        this.setContextValue(context.identity, 'apiKey');
+        this.setContextValue(context.identity, 'caller');
+        this.setContextValue(context.identity, 'cognitoAuthenticationProvider');
+        this.setContextValue(context.identity, 'cognitoAuthenticationType');
+        this.setContextValue(context.identity, 'cognitoIdentityId');
+        this.setContextValue(context.identity, 'cognitoIdentityPoolId');
+        this.setContextValue(context.identity, 'sourceIp');
+        this.setContextValue(context.identity, 'userAgent');
+        this.setContextValue(context.identity, 'userArn');
+        this.setContextValue(context.identity, 'user');
+        this.setContextValue(context, 'apiId');
+        this.setContextValue(context, 'requestId');
+        this.setContextValue(context, 'resourceId');
+        context.stage = this.getBasePath().replace(/^\//,'');
+    }
+
+    private setContextDefaults(context:any, request:Request) {
         context.httpMethod = request.method;
         /**
          * In API Gateway, base path is not part of path when passing it to lambda.
@@ -219,12 +249,13 @@ class ApiGatewaySim {
         else {
             context.resourcePath = request.path;
         }
+        this.setContextValues(context, request);
     }
 
     private parseEvent(method:Method, request:Request) {
         let bodyTemplate = new BodyTemplate();
         bodyTemplate.context = this.getContextJson();
-        this.setHttpRequestContext(bodyTemplate.context, request);
+        this.setContextDefaults(bodyTemplate.context, request);
         bodyTemplate.headers = request.headers;
         if (request.params) {
             bodyTemplate.pathParams = request.params;
@@ -234,7 +265,7 @@ class ApiGatewaySim {
         }
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
-        bodyTemplate.payload = JSON.stringify(request.body);
+        bodyTemplate.payload = this.getRequestBody(JSON.stringify(request.body));
         bodyTemplate.stageVariables = this.getStageVariables();
         let contextType:string = request.headers['content-type'];
         if (!contextType) { contextType = 'application/json'; }
@@ -323,7 +354,6 @@ class ApiGatewaySim {
         let jsonEncodedEvent = this.parseEvent(method, request);
         let eventJson = this.mergeEventData(jsonEncodedEvent);
         let context = this.getContextJson();
-        this.setHttpRequestContext(context, request);
         let requestObject = {
             eventJson:eventJson,
             packageJson:this._packageJson,
