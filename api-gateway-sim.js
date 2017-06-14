@@ -405,7 +405,7 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.sendAwsProxyResponse = function (httpResponse, method, message) {
         var errorMessage = "Internal server error";
-        if (!message.body) {
+        if (!message || !message.body) {
             return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
         }
         try {

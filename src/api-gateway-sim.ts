@@ -449,7 +449,7 @@ class ApiGatewaySim {
 
     private sendAwsProxyResponse(httpResponse:Response, method:Method, message:any) {
         let errorMessage = "Internal server error";
-        if (!message.body) {
+        if (!message || !message.body) {
             return this.sendHttpErrorBadGateway(httpResponse, errorMessage)
         }
         try {

@@ -1,5 +1,8 @@
 # Change log
 
+1.2.14
+* Fix proxy error handling
+
 1.2.13
 * Remove event.context in proxy passthrough
 
