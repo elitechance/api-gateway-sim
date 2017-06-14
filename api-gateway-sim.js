@@ -321,6 +321,9 @@ var ApiGatewaySim = (function () {
             if (requestObject.eventJson.params) {
                 delete requestObject.eventJson.params;
             }
+            if (requestObject.eventJson.context) {
+                delete requestObject.eventJson.context;
+            }
             if (requestObject.eventJson['body-json']) {
                 delete requestObject.eventJson['body-json'];
             }

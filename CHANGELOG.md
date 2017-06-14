@@ -1,5 +1,8 @@
 # Change log
 
+1.2.13
+* Remove event.context in proxy passthrough
+
 1.2.12
 * Support for raw headers in proxy passthrough
 
