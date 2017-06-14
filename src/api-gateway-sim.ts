@@ -265,7 +265,7 @@ class ApiGatewaySim {
         }
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
-        bodyTemplate.payload = this.getRequestBody(JSON.stringify(request.body));
+        bodyTemplate.payload = request.body;
         bodyTemplate.stageVariables = this.getStageVariables();
         let contextType:string = request.headers['content-type'];
         if (!contextType) { contextType = 'application/json'; }
@@ -318,18 +318,18 @@ class ApiGatewaySim {
         return null;
     }
 
-    private setProxyStageVariables(path:Path, event:any) {
+    private setProxyStageVariables(path:Path, event:any, request:Request) {
         if (!event.requestContext) {
             event.requestContext = {};
         }
         event.requestContext.stage = this._openApiConfig.basePath.replace(/^\//, '');
         event.requestContext.resourcePath = path.pattern;
-        event.requestContext.path = this._openApiConfig.basePath+event.path;
+        event.requestContext.path = request.originalUrl;
     }
 
     private getRequestBody(body:any) {
         try {
-            return JSON.parse(body);
+            return JSON.stringify(body);
         }
         catch (error) {
             return body;
@@ -339,13 +339,20 @@ class ApiGatewaySim {
     private processProxyData(path:Path, request:Request, requestObject:any) {
         let proxyName = this.getProxyName(path);
         if (proxyName) {
-            let proxyValue = requestObject.eventJson.pathParameters['0'];
+            let proxyValue = request.params['0'];
             let pathParameters:any = {};
             pathParameters[proxyName] = proxyValue;
             requestObject.eventJson.pathParameters = pathParameters;
             requestObject.eventJson.resource = path.pattern;
-            requestObject.eventJson.body = this.getRequestBody(request.body);
-            this.setProxyStageVariables(path, requestObject.eventJson);
+            requestObject.eventJson.body = request.body.toString();
+            requestObject.eventJson.path = request.originalUrl.replace(this.getBasePath(), '');
+            if (requestObject.eventJson.params) {
+                delete requestObject.eventJson.params;
+            }
+            if (requestObject.eventJson['body-json']) {
+                delete requestObject.eventJson['body-json'];
+            }
+            this.setProxyStageVariables(path, requestObject.eventJson, request);
         }
         return requestObject;
     }

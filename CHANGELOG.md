@@ -1,5 +1,8 @@
 # Change log
 
+1.2.11
+* Fix proxy passthrough data
+
 1.2.10
 * Update templates/pass-through.vtl
 * Support `context.user-agent`
