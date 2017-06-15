@@ -352,6 +352,7 @@ class ApiGatewaySim {
             let proxyValue = request.params['0'];
             let pathParameters:any = {};
             pathParameters[proxyName] = proxyValue;
+            return pathParameters;
         }
         return null;
     }

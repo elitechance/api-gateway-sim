@@ -313,6 +313,7 @@ var ApiGatewaySim = (function () {
             var proxyValue = request.params['0'];
             var pathParameters = {};
             pathParameters[proxyName] = proxyValue;
+            return pathParameters;
         }
         return null;
     };
