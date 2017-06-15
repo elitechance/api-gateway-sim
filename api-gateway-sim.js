@@ -288,7 +288,7 @@ var ApiGatewaySim = (function () {
         }
         event.requestContext.stage = this._openApiConfig.basePath.replace(/^\//, '');
         event.requestContext.resourcePath = path.pattern;
-        event.requestContext.path = request.originalUrl;
+        event.requestContext.path = this.getPathInOriginalUrl(request.originalUrl);
     };
     ApiGatewaySim.prototype.getRequestBody = function (body) {
         try {
@@ -307,26 +307,49 @@ var ApiGatewaySim = (function () {
         }
         return rawHeaders;
     };
-    ApiGatewaySim.prototype.processProxyData = function (path, request, requestObject) {
+    ApiGatewaySim.prototype.getProxyPathParams = function (path, request) {
         var proxyName = this.getProxyName(path);
         if (proxyName) {
             var proxyValue = request.params['0'];
             var pathParameters = {};
             pathParameters[proxyName] = proxyValue;
-            requestObject.eventJson.pathParameters = pathParameters;
+        }
+        return null;
+    };
+    ApiGatewaySim.prototype.removeNonProxyFields = function (event) {
+        if (event.context) {
+            delete event.context;
+        }
+        if (event.params) {
+            delete event.params;
+        }
+        if (event['body-json']) {
+            delete event['body-json'];
+        }
+    };
+    ApiGatewaySim.prototype.getPathInOriginalUrl = function (url) {
+        var pathContainer = url.replace(this.getBasePath(), '');
+        var info = pathContainer.split('?', 1);
+        return info[0];
+    };
+    ApiGatewaySim.prototype.isObjectEmpty = function (object) {
+        return Object.keys(object).length === 0 && object.constructor === Object;
+    };
+    ApiGatewaySim.prototype.getProxyQueryString = function (request) {
+        if (this.isObjectEmpty(request.query)) {
+            return null;
+        }
+        return request.query;
+    };
+    ApiGatewaySim.prototype.processProxyData = function (path, method, request, requestObject) {
+        if (method.integration.type === 'aws_proxy') {
+            requestObject.eventJson.pathParameters = this.getProxyPathParams(path, request);
             requestObject.eventJson.resource = path.pattern;
             requestObject.eventJson.body = request.body.toString();
-            requestObject.eventJson.path = request.originalUrl.replace(this.getBasePath(), '');
+            requestObject.eventJson.path = this.getPathInOriginalUrl(request.originalUrl);
             requestObject.eventJson.headers = this.getRawHeaders(request);
-            if (requestObject.eventJson.params) {
-                delete requestObject.eventJson.params;
-            }
-            if (requestObject.eventJson.context) {
-                delete requestObject.eventJson.context;
-            }
-            if (requestObject.eventJson['body-json']) {
-                delete requestObject.eventJson['body-json'];
-            }
+            requestObject.eventJson.queryStringParameters = this.getProxyQueryString(request);
+            this.removeNonProxyFields(requestObject.eventJson);
             this.setProxyStageVariables(path, requestObject.eventJson, request);
         }
         return requestObject;
@@ -342,7 +365,7 @@ var ApiGatewaySim = (function () {
             stageVariables: this.getStageVariables(),
             lambdaTimeout: this.getLambdaTimeout()
         };
-        return this.processProxyData(path, request, requestObject);
+        return this.processProxyData(path, method, request, requestObject);
     };
     ApiGatewaySim.prototype.getMethodResponseByStatusCode = function (method, statusCode) {
         for (var index in method.responses) {

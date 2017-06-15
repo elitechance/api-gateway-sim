@@ -1,5 +1,9 @@
 # Change log
 
+1.2.16
+* Support proxy with empty ID
+* Support for proxy query string
+
 1.2.15
 * Simulate error body during callback(new Error());
 

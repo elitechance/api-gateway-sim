@@ -324,7 +324,7 @@ class ApiGatewaySim {
         }
         event.requestContext.stage = this._openApiConfig.basePath.replace(/^\//, '');
         event.requestContext.resourcePath = path.pattern;
-        event.requestContext.path = request.originalUrl;
+        event.requestContext.path = this.getPathInOriginalUrl(request.originalUrl);
     }
 
     private getRequestBody(body:any) {
@@ -346,26 +346,46 @@ class ApiGatewaySim {
         return rawHeaders;
     }
 
-    private processProxyData(path:Path, request:Request, requestObject:any) {
+    private getProxyPathParams(path:Path, request:Request) {
         let proxyName = this.getProxyName(path);
         if (proxyName) {
             let proxyValue = request.params['0'];
             let pathParameters:any = {};
             pathParameters[proxyName] = proxyValue;
-            requestObject.eventJson.pathParameters = pathParameters;
+        }
+        return null;
+    }
+
+    private removeNonProxyFields(event:any) {
+        if (event.context) { delete event.context; }
+        if (event.params) { delete event.params; }
+        if (event['body-json']) { delete event['body-json']; }
+    }
+
+    private getPathInOriginalUrl(url:string) {
+        let pathContainer = url.replace(this.getBasePath(), '');
+        let info = pathContainer.split('?', 1);
+        return info[0];
+    }
+
+    private isObjectEmpty(object:any) {
+        return Object.keys(object).length === 0 && object.constructor === Object;
+    }
+
+    private getProxyQueryString(request:Request) {
+        if (this.isObjectEmpty(request.query)) { return null; }
+        return request.query;
+    }
+
+    private processProxyData(path:Path, method:Method, request:Request, requestObject:any) {
+        if (method.integration.type === 'aws_proxy') {
+            requestObject.eventJson.pathParameters = this.getProxyPathParams(path, request);
             requestObject.eventJson.resource = path.pattern;
             requestObject.eventJson.body = request.body.toString();
-            requestObject.eventJson.path = request.originalUrl.replace(this.getBasePath(), '');
+            requestObject.eventJson.path = this.getPathInOriginalUrl(request.originalUrl);
             requestObject.eventJson.headers = this.getRawHeaders(request);
-            if (requestObject.eventJson.params) {
-                delete requestObject.eventJson.params;
-            }
-            if (requestObject.eventJson.context) {
-                delete requestObject.eventJson.context;
-            }
-            if (requestObject.eventJson['body-json']) {
-                delete requestObject.eventJson['body-json'];
-            }
+            requestObject.eventJson.queryStringParameters = this.getProxyQueryString(request);
+            this.removeNonProxyFields(requestObject.eventJson);
             this.setProxyStageVariables(path, requestObject.eventJson, request);
         }
         return requestObject;
@@ -382,7 +402,7 @@ class ApiGatewaySim {
             stageVariables:this.getStageVariables(),
             lambdaTimeout:this.getLambdaTimeout()
         };
-        return this.processProxyData(path, request, requestObject);
+        return this.processProxyData(path, method, request, requestObject);
     }
 
     private getMethodResponseByStatusCode(method:Method, statusCode:number):MethodResponse {
