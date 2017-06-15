@@ -370,8 +370,20 @@ var ApiGatewaySim = (function () {
             }
         }
     };
-    ApiGatewaySim.prototype.sendHttpErrorResponse = function (httpResponse, message) {
-        httpResponse.send({ errorMessage: message });
+    ApiGatewaySim.prototype.sendHttpErrorResponse = function (httpResponse, error) {
+        if (typeof error === 'string') {
+            httpResponse.send(error);
+        }
+        else {
+            httpResponse.send(this.getErrorResponse(error));
+        }
+    };
+    ApiGatewaySim.prototype.getErrorResponse = function (error) {
+        return {
+            errorMessage: error.message,
+            errorType: error.name,
+            stackTrace: error.stack.split("\n")
+        };
     };
     ApiGatewaySim.prototype.sendHttpErrorBadGateway = function (httpResponse, message) {
         httpResponse.statusMessage = http_status_1.default.getMessageByCode(502);
@@ -464,7 +476,9 @@ var ApiGatewaySim = (function () {
                 this.setHeadersByIntegrationResponse(integrationResponse, method, httpResponse);
             }
             httpResponse.statusMessage = error.message;
-            httpResponse.status(integrationResponse.statusCode).end();
+            httpResponse.status(integrationResponse.statusCode)
+                .send(this.getErrorResponse(lambdaResponse.error))
+                .end();
         }
         else {
             if (httpRequest.method != 'HEAD') {

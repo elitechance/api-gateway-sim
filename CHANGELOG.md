@@ -1,5 +1,8 @@
 # Change log
 
+1.2.15
+* Simulate error body during callback(new Error());
+
 1.2.14
 * Fix proxy error handling
 

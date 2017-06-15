@@ -14,7 +14,7 @@ export class Handler {
 
     constructor() {
         process.on('uncaughtException', (error:Error) => {
-            process.send({lambdaError:true, error:error.stack});
+            process.send({lambdaError:true, error:error});
             process.exit(0);
         });
         process.on('message', (request) => {

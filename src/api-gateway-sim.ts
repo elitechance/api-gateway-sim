@@ -411,8 +411,21 @@ class ApiGatewaySim {
         }
     }
 
-    private sendHttpErrorResponse(httpResponse:Response, message:string) {
-        httpResponse.send({errorMessage:message});
+    private sendHttpErrorResponse(httpResponse:Response, error:any) {
+        if (typeof error === 'string') {
+            httpResponse.send(error);
+        }
+        else {
+            httpResponse.send(this.getErrorResponse(error));
+        }
+    }
+
+    private getErrorResponse(error:Error) {
+        return {
+            errorMessage:error.message,
+            errorType:error.name,
+            stackTrace:error.stack.split("\n")
+        };
     }
 
     private sendHttpErrorBadGateway(httpResponse:Response, message:string) {
@@ -507,7 +520,9 @@ class ApiGatewaySim {
                 this.setHeadersByIntegrationResponse(integrationResponse, method, httpResponse);
             }
             httpResponse.statusMessage = error.message;
-            httpResponse.status(integrationResponse.statusCode).end();
+            httpResponse.status(integrationResponse.statusCode)
+                .send(this.getErrorResponse(lambdaResponse.error))
+                .end();
         }
         else {
             if (httpRequest.method != 'HEAD') {
