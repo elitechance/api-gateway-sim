@@ -442,10 +442,17 @@ class ApiGatewaySim {
     }
 
     private getErrorResponse(error:Error) {
+        let stackTrace = [];
+        let errorMessage = "";
+        let errorType = "";
+
+        if (error.stack) { stackTrace = error.stack.split("\n"); }
+        if (error.message) { errorMessage = error.message; }
+        if (error.name) { errorType = error.name; }
         return {
-            errorMessage:error.message,
-            errorType:error.name,
-            stackTrace:error.stack.split("\n")
+            errorMessage:errorMessage,
+            errorType:errorType,
+            stackTrace:stackTrace
         };
     }
 

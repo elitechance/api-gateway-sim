@@ -403,10 +403,22 @@ var ApiGatewaySim = (function () {
         }
     };
     ApiGatewaySim.prototype.getErrorResponse = function (error) {
+        var stackTrace = [];
+        var errorMessage = "";
+        var errorType = "";
+        if (error.stack) {
+            stackTrace = error.stack.split("\n");
+        }
+        if (error.message) {
+            errorMessage = error.message;
+        }
+        if (error.name) {
+            errorType = error.name;
+        }
         return {
-            errorMessage: error.message,
-            errorType: error.name,
-            stackTrace: error.stack.split("\n")
+            errorMessage: errorMessage,
+            errorType: errorType,
+            stackTrace: stackTrace
         };
     };
     ApiGatewaySim.prototype.sendHttpErrorBadGateway = function (httpResponse, message) {

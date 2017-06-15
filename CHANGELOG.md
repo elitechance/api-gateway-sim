@@ -1,5 +1,8 @@
 # Change log
 
+1.2.17
+* Fix error object handling
+
 1.2.16
 * Support proxy with empty ID
 * Support for proxy query string
