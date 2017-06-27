@@ -386,6 +386,7 @@ class ApiGatewaySim {
             requestObject.eventJson.path = this.getPathInOriginalUrl(request.originalUrl);
             requestObject.eventJson.headers = this.getRawHeaders(request);
             requestObject.eventJson.queryStringParameters = this.getProxyQueryString(request);
+            requestObject.eventJson.httpMethod = request.method;
             this.removeNonProxyFields(requestObject.eventJson);
             this.setProxyStageVariables(path, requestObject.eventJson, request);
         }

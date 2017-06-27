@@ -1,5 +1,8 @@
 # Change log
 
+1.2.18
+* Fix httpMethod in proxy
+
 1.2.17
 * Fix error object handling
 
