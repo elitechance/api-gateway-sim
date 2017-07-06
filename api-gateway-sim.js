@@ -452,6 +452,20 @@ var ApiGatewaySim = (function () {
             }
         }
     };
+    ApiGatewaySim.prototype.setMessageStatusCode = function (response, message) {
+        if (message.statusCode) {
+            response.statusCode = message.statusCode;
+            response.statusMessage = http_status_1.default.getMessageByCode(message.statusCode);
+        }
+    };
+    ApiGatewaySim.prototype.setMessageHeaders = function (response, message) {
+        if (message.headers) {
+            for (var _i = 0, _a = message.headers; _i < _a.length; _i++) {
+                var header = _a[_i];
+                response.setHeader(header, message.headers[header]);
+            }
+        }
+    };
     ApiGatewaySim.prototype.sendAwsProxyResponse = function (httpResponse, method, message) {
         var errorMessage = "Internal server error";
         if (!message || !message.body) {
@@ -474,10 +488,8 @@ var ApiGatewaySim = (function () {
                 return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
             }
             else {
-                if (message.statusCode) {
-                    httpResponse.statusCode = message.statusCode;
-                    httpResponse.statusMessage = http_status_1.default.getMessageByCode(message.statusCode);
-                }
+                this.setMessageStatusCode(httpResponse, message);
+                this.setMessageHeaders(httpResponse, message);
                 this.sendDefaultResponse(httpResponse, method, parseBody);
             }
         }

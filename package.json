@@ -1,6 +1,6 @@
 {
   "name": "api-gateway-sim",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "description": "AWS API Gateway simulator for Node JS Lambda",
   "main": "api-gateway-sim.js",
   "bin": {

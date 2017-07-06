@@ -489,6 +489,21 @@ class ApiGatewaySim {
         }
     }
 
+    private setMessageStatusCode(response:Response, message:any) {
+        if (message.statusCode) {
+            response.statusCode = message.statusCode;
+            response.statusMessage = HttpStatus.getMessageByCode(message.statusCode);
+        }
+    }
+
+    private setMessageHeaders(response:Response, message:any) {
+        if (message.headers) {
+            for(let header of message.headers) {
+                response.setHeader(header, message.headers[header]);
+            }
+        }
+    }
+
     private sendAwsProxyResponse(httpResponse:Response, method:Method, message:any) {
         let errorMessage = "Internal server error";
         if (!message || !message.body) {
@@ -509,10 +524,8 @@ class ApiGatewaySim {
                 return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
             }
             else {
-                if (message.statusCode) {
-                    httpResponse.statusCode = message.statusCode;
-                    httpResponse.statusMessage = HttpStatus.getMessageByCode(message.statusCode);
-                }
+                this.setMessageStatusCode(httpResponse, message);
+                this.setMessageHeaders(httpResponse, message);
                 this.sendDefaultResponse(httpResponse, method, parseBody);
             }
         }

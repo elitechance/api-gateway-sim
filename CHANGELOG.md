@@ -1,5 +1,8 @@
 # Change log
 
+1.2.19
+* Support for headers in proxy response
+
 1.2.18
 * Fix httpMethod in proxy
 
