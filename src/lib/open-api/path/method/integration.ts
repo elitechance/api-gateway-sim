@@ -2,47 +2,11 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodIntegrationResponse from "./integration/response";
-import PathMethodIntegrationResponseRequestTemplate from "./integration/response/request/template";
+import PathMethodIntegrationResponse from './integration/response';
+import PathMethodIntegrationResponseRequestTemplate from './integration/response/request/template';
 
 export default class Integration {
-    private _responses:Array<PathMethodIntegrationResponse> = [];
-    private _requestTemplates:Array<PathMethodIntegrationResponseRequestTemplate> = [];
-    private _uri:string;
-    private _passthroughBehavior:string;
-    private _httpMethod:string;
-    private _contentHandling:string;
-    private _type:string;
-
-    get defaultResponse(): PathMethodIntegrationResponse {
-        let responses = this.responses;
-
-        if (!responses) return null;
-
-        let response:PathMethodIntegrationResponse;
-        for (let index in responses) {
-            response = responses[index];
-            if (response.pattern == 'default') {
-                return response;
-            }
-        }
-
-        return null;
-    }
-
-    public getResponseByErrorMessage(errorMessage:string):PathMethodIntegrationResponse {
-        let regularExpress:RegExp;
-        let defaultResponse;
-        for(let index in this.responses) {
-            let response = this.responses[index];
-            if (response.pattern == 'default') { defaultResponse = response; }
-            regularExpress = new RegExp(response.pattern);
-            if (errorMessage.match(regularExpress)) {
-                return response;
-            }
-        }
-        return defaultResponse;
-    }
+    private _responses: Array<PathMethodIntegrationResponse> = [];
 
     get responses(): Array<PathMethodIntegrationResponse> {
         return this._responses;
@@ -52,6 +16,8 @@ export default class Integration {
         this._responses = value;
     }
 
+    private _requestTemplates: Array<PathMethodIntegrationResponseRequestTemplate> = [];
+
     get requestTemplates(): Array<PathMethodIntegrationResponseRequestTemplate> {
         return this._requestTemplates;
     }
@@ -59,6 +25,8 @@ export default class Integration {
     set requestTemplates(value: Array<PathMethodIntegrationResponseRequestTemplate>) {
         this._requestTemplates = value;
     }
+
+    private _uri: string;
 
     get uri(): string {
         return this._uri;
@@ -68,6 +36,8 @@ export default class Integration {
         this._uri = value;
     }
 
+    private _passthroughBehavior: string;
+
     get passthroughBehavior(): string {
         return this._passthroughBehavior;
     }
@@ -75,6 +45,8 @@ export default class Integration {
     set passthroughBehavior(value: string) {
         this._passthroughBehavior = value;
     }
+
+    private _httpMethod: string;
 
     get httpMethod(): string {
         return this._httpMethod;
@@ -84,6 +56,8 @@ export default class Integration {
         this._httpMethod = value;
     }
 
+    private _contentHandling: string;
+
     get contentHandling(): string {
         return this._contentHandling;
     }
@@ -92,11 +66,47 @@ export default class Integration {
         this._contentHandling = value;
     }
 
+    private _type: string;
+
     get type(): string {
         return this._type;
     }
 
     set type(value: string) {
         this._type = value;
+    }
+
+    get defaultResponse(): PathMethodIntegrationResponse {
+        const responses = this.responses;
+
+        if (!responses) {
+            return null;
+        }
+
+        let response: PathMethodIntegrationResponse;
+        for (const respons of responses) {
+            response = respons;
+            if (response.pattern === 'default') {
+                return response;
+            }
+        }
+
+        return null;
+    }
+
+    public getResponseByErrorMessage(errorMessage: string): PathMethodIntegrationResponse {
+        let regularExpress: RegExp;
+        let defaultResponse;
+        for (const respons of this.responses) {
+            const response = respons;
+            if (response.pattern === 'default') {
+                defaultResponse = response;
+            }
+            regularExpress = new RegExp(response.pattern);
+            if (errorMessage.match(regularExpress)) {
+                return response;
+            }
+        }
+        return defaultResponse;
     }
 }

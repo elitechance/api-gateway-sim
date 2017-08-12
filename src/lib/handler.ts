@@ -2,19 +2,18 @@
  * Created by EGomez on 3/5/17.
  */
 
-import Callback from "./callback";
+import Callback from './callback';
 import express = require('express');
 import Request = express.Request;
 import Response = express.Response;
 
 export class Handler {
-    private _request;
     private _packageJson;
     private _exports;
 
     constructor() {
-        process.on('uncaughtException', (error:Error) => {
-            process.send({lambdaError:true, error:error});
+        process.on('uncaughtException', (error: Error) => {
+            process.send({lambdaError: true, error: error});
             process.exit(0);
         });
         process.on('message', (request) => {
@@ -24,16 +23,26 @@ export class Handler {
         });
     }
 
-    private runLambda() {
-        let contextMethods = this.getContextMethods();
-        let contextJson = Object['assign'](contextMethods, this.request.contextJson);
+    private _request;
 
-        setTimeout(() =>{
-            process.send({timeout:true});
+    get request() {
+        return this._request;
+    }
+
+    set request(value) {
+        this._request = value;
+    }
+
+    private runLambda() {
+        const contextMethods = this.getContextMethods();
+        const contextJson = Object['assign'](contextMethods, this.request.contextJson);
+
+        setTimeout(() => {
+            process.send({timeout: true});
             process.exit(0);
-        },this.getLambdaTimeout() * 1000);
-        this._exports.handler(this.request.eventJson,contextJson, (error,message) =>{
-            let callback = this.getNewCallback();
+        }, this.getLambdaTimeout() * 1000);
+        this._exports.handler(this.request.eventJson, contextJson, (error, message) => {
+            const callback = this.getNewCallback();
             callback.handler(error, message);
         });
     }
@@ -43,25 +52,25 @@ export class Handler {
         this._packageJson = this.request.packageJson;
     }
 
-    private purgeCache(moduleName:string) {
+    private purgeCache(moduleName: string) {
         this.searchCache(moduleName, function (mod) {
             delete require.cache[mod.id];
         });
 
-        Object.keys(module.constructor['_pathCache']).forEach(function(cacheKey) {
-            if (cacheKey.indexOf(moduleName)>0) {
+        Object.keys(module.constructor['_pathCache']).forEach(function (cacheKey) {
+            if (cacheKey.indexOf(moduleName) > 0) {
                 delete module.constructor['_pathCache'][cacheKey];
             }
         });
     }
 
-    private searchCache(moduleName, callback:Function) {
+    private searchCache(moduleName, callback: Function) {
         // Resolve the module identified by the specified name
-        let mod = require.resolve(moduleName);
+        let module = require.resolve(moduleName);
 
         // Check if the module has been resolved and found within
         // the cache
-        if (mod && ((mod = require.cache[mod]) !== undefined)) {
+        if (module && ((module = require.cache[module]) !== undefined)) {
             // Recursively go over the results
             (function traverse(mod) {
                 // Go over each of the module's children and
@@ -72,21 +81,21 @@ export class Handler {
                 // Call the specified callback providing the
                 // found cached module
                 callback(mod);
-            }(mod));
+            }(module));
         }
     }
 
     private getModule() {
-        return process.cwd()+'/'+this._packageJson.main;
+        return process.cwd() + '/' + this._packageJson.main;
     }
 
     private loadLambdaHandler() {
-        let module = this.getModule();
+        const module = this.getModule();
         this._exports = require(module);
     }
 
     private getLambdaTimeout() {
-        let timeout = this.request.lambdaTimeout;
+        const timeout = this.request.lambdaTimeout;
         if (timeout > 300) {
             return 300; // Max timeout is 5 minutes in lambda
         }
@@ -94,8 +103,8 @@ export class Handler {
     }
 
     private getNewCallback() {
-        let callback = new Callback();
-        let lambdaTimeout = this.getLambdaTimeout();
+        const callback = new Callback();
+        const lambdaTimeout = this.getLambdaTimeout();
         if (lambdaTimeout) {
             callback.timeout = lambdaTimeout;
         }
@@ -103,23 +112,23 @@ export class Handler {
         return callback;
     }
 
-    private getContextMethods():any {
-        let callback = this.getNewCallback();
+    private getContextMethods(): any {
+        const callback = this.getNewCallback();
         return {
-            succeed: function(result) { callback.handler(null, result); },
-            fail: function(result) { callback.handler(result); },
-            done: function() { callback.handler(null, null); },
-            getRemainingTimeInMillis: function () { return callback.getRemainingTimeInMillis(); }
+            succeed: function (result) {
+                callback.handler(null, result);
+            },
+            fail: function (result) {
+                callback.handler(result);
+            },
+            done: function () {
+                callback.handler(null, null);
+            },
+            getRemainingTimeInMillis: function () {
+                return callback.getRemainingTimeInMillis();
+            }
         };
-    }
-
-    get request() {
-        return this._request;
-    }
-
-    set request(value) {
-        this._request = value;
     }
 }
 
-new Handler();
+const handler = new Handler();

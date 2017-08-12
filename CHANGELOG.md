@@ -1,4 +1,9 @@
 # Change log
+1.2.20
+* Bug fix on proxy and non proxy request body parsing
+* Bug fix when request body is empty
+* Add tslint.json
+* Fix code format and follow tslint
 
 1.2.19
 * Support for headers in proxy response

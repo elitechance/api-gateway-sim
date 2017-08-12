@@ -24,9 +24,12 @@ export default class Util {
     base64Decode(encodedString) {
         return (new Buffer(encodedString, 'base64')).toString();
     }
+
     escapeJavaScript(x) {
-        if (!x) { return ""; }
-        return x.split("").map((c) => {
+        if (!x) {
+            return '';
+        }
+        return x.split('').map((c) => {
             // 2.a - 2.c
             if (c in this.escapeJavaScriptTable) {
                 return this.escapeJavaScriptTable[c];
@@ -34,7 +37,7 @@ export default class Util {
 
             // 2.d
             return c;
-        }).join("");
+        }).join('');
     }
 
     parseJson(jsonString) {
@@ -44,6 +47,7 @@ export default class Util {
     urlEncode(sourceString) {
         return encodeURIComponent(sourceString);
     }
+
     urlDecode(sourceString) {
         return decodeURIComponent(sourceString);
     }

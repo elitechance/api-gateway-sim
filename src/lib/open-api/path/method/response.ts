@@ -1,14 +1,11 @@
-import PathMethodResponseStatus from "./response/status";
+import PathMethodResponseStatus from './response/status';
+
 /**
  * Created by EGomez on 3/15/17.
  */
 
 export default class Response {
-    private _statusCode:number;
-    private _description:string;
-    private _schema:string;
-    private _headers:Array<string> = [];
-
+    private _statusCode: number;
 
     get statusCode(): number {
         return this._statusCode;
@@ -18,6 +15,8 @@ export default class Response {
         this._statusCode = value;
     }
 
+    private _description: string;
+
     get description(): string {
         return this._description;
     }
@@ -26,6 +25,8 @@ export default class Response {
         this._description = value;
     }
 
+    private _schema: string;
+
     get schema(): string {
         return this._schema;
     }
@@ -33,6 +34,8 @@ export default class Response {
     set schema(value: string) {
         this._schema = value;
     }
+
+    private _headers: Array<string> = [];
 
     get headers(): Array<string> {
         return this._headers;

@@ -3,8 +3,7 @@
  */
 
 export default class Parameter {
-    private _header:string;
-    private _value:string;
+    private _header: string;
 
     get header(): string {
         return this._header;
@@ -13,6 +12,8 @@ export default class Parameter {
     set header(value: string) {
         this._header = value;
     }
+
+    private _value: string;
 
     get value(): string {
         return this._value;

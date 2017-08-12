@@ -2,11 +2,10 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethod from "./path/method";
+import PathMethod from './path/method';
 
 export default class ConfigInfo {
-    private _version:string;
-    private _title:string;
+    private _version: string;
 
     get version(): string {
         return this._version;
@@ -15,6 +14,8 @@ export default class ConfigInfo {
     set version(value: string) {
         this._version = value;
     }
+
+    private _title: string;
 
     get title(): string {
         return this._title;

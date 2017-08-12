@@ -10,23 +10,23 @@ var core_1 = require("@angular/core");
 var AppComponent = (function () {
     function AppComponent() {
         this.menus = [
-            //{id:1, name:"Api Manager", active:false, error:false},
-            { id: 2, name: "Body Mapping Parser", active: false, error: false }
+            // {id:1, name:"Api Manager", active:false, error:false},
+            { id: 2, name: 'Body Mapping Parser', active: false, error: false }
         ];
     }
-    AppComponent.prototype.onChangeMenu = function (menu) {
-        this.activeMenuId = menu.id;
-    };
     AppComponent.prototype.ngOnInit = function () {
         this.activeMenuId = this.menus[0].id;
     };
+    AppComponent.prototype.onChangeMenu = function (menu) {
+        this.activeMenuId = menu.id;
+    };
+    AppComponent = __decorate([
+        core_1.Component({
+            selector: 'ags-app',
+            templateUrl: '/app/app.component.html',
+        })
+    ], AppComponent);
     return AppComponent;
 }());
-AppComponent = __decorate([
-    core_1.Component({
-        selector: 'ags-app',
-        templateUrl: '/app/app.component.html',
-    })
-], AppComponent);
 exports.AppComponent = AppComponent;
 //# sourceMappingURL=app.component.js.map

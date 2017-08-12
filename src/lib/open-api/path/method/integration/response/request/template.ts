@@ -1,11 +1,11 @@
-import PathMethodResponses from "../../../response";
+import PathMethodResponses from '../../../response';
 /**
  * Created by EGomez on 3/15/17.
  */
 
 export default class Template {
-    private _contentType:string;
-    private _template:string;
+    private _contentType: string;
+    private _template: string;
 
     get contentType(): string {
         return this._contentType;

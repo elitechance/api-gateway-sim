@@ -2,24 +2,11 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodResponse from "./method/response";
-import PathMethodIntegration from "./method/integration";
+import PathMethodResponse from './method/response';
+import PathMethodIntegration from './method/integration';
 
 export default class Method {
-    private _name:string;
-    private _consumes:Array<string>;
-    private _produces:Array<string>;
-    private _responses:Array<PathMethodResponse> = [];
-    private _integration:PathMethodIntegration;
-
-    canConsume(contentType:string):boolean {
-        for(let index in this.consumes) {
-            if (this.consumes[index] == contentType) {
-                return true;
-            }
-        }
-        return false;
-    }
+    private _name: string;
 
     get name(): string {
         return this._name;
@@ -29,6 +16,8 @@ export default class Method {
         this._name = value;
     }
 
+    private _consumes: Array<string>;
+
     get consumes(): Array<string> {
         return this._consumes;
     }
@@ -36,6 +25,8 @@ export default class Method {
     set consumes(value: Array<string>) {
         this._consumes = value;
     }
+
+    private _produces: Array<string>;
 
     get produces(): Array<string> {
         return this._produces;
@@ -45,6 +36,8 @@ export default class Method {
         this._produces = value;
     }
 
+    private _responses: Array<PathMethodResponse> = [];
+
     get responses(): Array<PathMethodResponse> {
         return this._responses;
     }
@@ -53,11 +46,22 @@ export default class Method {
         this._responses = value;
     }
 
+    private _integration: PathMethodIntegration;
+
     get integration(): PathMethodIntegration {
         return this._integration;
     }
 
     set integration(value: PathMethodIntegration) {
         this._integration = value;
+    }
+
+    canConsume(contentType: string): boolean {
+        for (const index in this.consumes) {
+            if (this.consumes[index] == contentType) {
+                return true;
+            }
+        }
+        return false;
     }
 }

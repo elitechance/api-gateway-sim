@@ -55,7 +55,7 @@ var ApiGatewaySim = (function () {
         response.send(output);
     };
     ApiGatewaySim.prototype.getAgsRootPath = function () {
-        return __dirname + path.sep + "public";
+        return __dirname + path.sep + 'public';
     };
     ApiGatewaySim.prototype.getAgsServerModulesPath = function () {
         return this.getAgsRootPath() + path.sep + 'node_modules';
@@ -69,13 +69,13 @@ var ApiGatewaySim = (function () {
             port = 4000;
         }
         this._bodyTemplateServer.use(express.static(__dirname + '/public'));
-        this.logInfo("Running body template parser in port " + port);
+        this.logInfo('Running body template parser in port ' + port);
         this._bodyTemplateServer.listen(port);
         this._bodyTemplateServer.use(bodyParser.json());
         this._bodyTemplateServer.post('/parse', this.onParseRequest);
     };
     ApiGatewaySim.prototype.installAgsServerModules = function () {
-        this.logInfo("Installing needed modules for ags");
+        this.logInfo('Installing needed modules for ags');
         var exec = require('child_process').execSync;
         var cmd = 'npm install --production';
         exec(cmd, { cwd: this.getAgsRootPath() });
@@ -122,11 +122,11 @@ var ApiGatewaySim = (function () {
     ApiGatewaySim.prototype.initPlugins = function () {
         // Enable CORS by default for backward compatibility
         if (!this._strictCors) {
-            this.logInfo("Enable default CORS");
+            this.logInfo('Enable default CORS');
             this._gatewayServer.use(cors());
         }
         else {
-            this.logInfo("Using strict CORS");
+            this.logInfo('Using strict CORS');
         }
         this._gatewayServer.use(bodyParser.text({ type: '*/*' }));
         // parse application/x-www-form-urlencoded
@@ -149,16 +149,20 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.getPassThroughTemplate = function (type) {
         switch (type) {
-            case 'when_no_match': return this.getPassThroughTemplateContent();
-            case 'never': return "";
-            default: return this.getPassThroughTemplateContent();
+            case 'when_no_match':
+                return this.getPassThroughTemplateContent();
+            case 'never':
+                return '';
+            default:
+                return this.getPassThroughTemplateContent();
         }
     };
     ApiGatewaySim.prototype.getRequestTemplate = function (method, contentType) {
         var templateValue = '';
-        for (var index in method.integration.requestTemplates) {
-            var template = method.integration.requestTemplates[index];
-            if (template.contentType == contentType) {
+        for (var _i = 0, _a = method.integration.requestTemplates; _i < _a.length; _i++) {
+            var requestTemplate = _a[_i];
+            var template = requestTemplate;
+            if (template.contentType === contentType) {
                 templateValue = template.template;
                 if (templateValue) {
                     return templateValue;
@@ -218,20 +222,41 @@ var ApiGatewaySim = (function () {
         }
         this.setContextValues(context, request);
     };
+    ApiGatewaySim.prototype.getBodyTemplatePayload = function (method, request) {
+        var payload;
+        if (request.method === 'GET') {
+            return '';
+        }
+        else {
+            if (method.integration.type === 'aws_proxy') {
+                payload = JSON.stringify(request.body);
+            }
+            else {
+                payload = request.body;
+            }
+        }
+        if (Object.keys(payload).length === 0 && payload.constructor === Object) {
+            return '';
+        }
+        return payload;
+    };
+    ApiGatewaySim.prototype.getBodyTemplatePathParams = function (request) {
+        if (request.params) {
+            return request.params;
+        }
+        else {
+            return {};
+        }
+    };
     ApiGatewaySim.prototype.parseEvent = function (method, request) {
         var bodyTemplate = new body_template_1.default();
         bodyTemplate.context = this.getContextJson();
         this.setContextDefaults(bodyTemplate.context, request);
         bodyTemplate.headers = request.headers;
-        if (request.params) {
-            bodyTemplate.pathParams = request.params;
-        }
-        else {
-            bodyTemplate.pathParams = {};
-        }
+        bodyTemplate.pathParams = this.getBodyTemplatePathParams(request);
         bodyTemplate.queryParams = this.getQueryParams(request);
         bodyTemplate.method = request.method;
-        bodyTemplate.payload = request.body;
+        bodyTemplate.payload = this.getBodyTemplatePayload(method, request);
         bodyTemplate.stageVariables = this.getStageVariables();
         var contextType = request.headers['content-type'];
         if (!contextType) {
@@ -239,7 +264,7 @@ var ApiGatewaySim = (function () {
         }
         var template = this.getRequestTemplate(method, contextType);
         if (!template) {
-            return "";
+            return '';
         }
         var compiled = bodyTemplate.parse(template);
         return compiled;
@@ -258,9 +283,9 @@ var ApiGatewaySim = (function () {
         return method;
     };
     ApiGatewaySim.prototype.sendErrorResponse = function (error) {
-        if (error.message != 'LAMBDA_DONE') {
+        if (error.message !== 'LAMBDA_DONE') {
             console.log(error.message);
-            this._currentResponse.statusMessage = "Server Error: " + error.message;
+            this._currentResponse.statusMessage = 'Server Error: ' + error.message;
             this._currentResponse.status(500).end();
         }
     };
@@ -370,9 +395,9 @@ var ApiGatewaySim = (function () {
         return this.processProxyData(path, method, request, requestObject);
     };
     ApiGatewaySim.prototype.getMethodResponseByStatusCode = function (method, statusCode) {
-        for (var index in method.responses) {
-            var response = method.responses[index];
-            if (response.statusCode == statusCode) {
+        for (var _i = 0, _a = method.responses; _i < _a.length; _i++) {
+            var response = _a[_i];
+            if (response.statusCode === statusCode) {
                 return response;
             }
         }
@@ -383,13 +408,15 @@ var ApiGatewaySim = (function () {
         if (methodResponse == null) {
             return;
         }
-        for (var headerIndex in methodResponse.headers) {
-            for (var responseParameterIndex in integrationResponse.responseParameters) {
-                var headerName = integrationResponse.responseParameters[responseParameterIndex].header;
-                var headerValue = integrationResponse.responseParameters[responseParameterIndex].value;
-                var methodResponseHeader = methodResponse.headers[headerIndex];
+        for (var _i = 0, _a = methodResponse.headers; _i < _a.length; _i++) {
+            var header = _a[_i];
+            for (var _b = 0, _c = integrationResponse.responseParameters; _b < _c.length; _b++) {
+                var responseParameter = _c[_b];
+                var headerName = responseParameter.header;
+                var headerValue = responseParameter.value;
+                var methodResponseHeader = header;
                 var responseHeader = integrationResponse.baseHeaderName + '.' + methodResponseHeader;
-                if (responseHeader == headerName) {
+                if (responseHeader === headerName) {
                     httpResponse.setHeader(methodResponseHeader, headerValue);
                 }
             }
@@ -405,10 +432,10 @@ var ApiGatewaySim = (function () {
     };
     ApiGatewaySim.prototype.getErrorResponse = function (error) {
         var stackTrace = [];
-        var errorMessage = "";
-        var errorType = "";
+        var errorMessage = '';
+        var errorType = '';
         if (error.stack) {
-            stackTrace = error.stack.split("\n");
+            stackTrace = error.stack.split('\n');
         }
         if (error.message) {
             errorMessage = error.message;
@@ -467,7 +494,7 @@ var ApiGatewaySim = (function () {
         }
     };
     ApiGatewaySim.prototype.sendAwsProxyResponse = function (httpResponse, method, message) {
-        var errorMessage = "Internal server error";
+        var errorMessage = 'Internal server error';
         if (!message || !message.body) {
             return this.sendHttpErrorBadGateway(httpResponse, errorMessage);
         }
@@ -494,7 +521,7 @@ var ApiGatewaySim = (function () {
             }
         }
         catch (error) {
-            return this.sendHttpErrorBadGateway(httpResponse, error + "");
+            return this.sendHttpErrorBadGateway(httpResponse, error + '');
         }
     };
     ApiGatewaySim.prototype.sendDefaultResponse = function (httpResponse, method, message) {
@@ -508,7 +535,8 @@ var ApiGatewaySim = (function () {
             case 'aws_proxy':
                 this.sendAwsProxyResponse(httpResponse, method, message);
                 break;
-            default: this.sendDefaultResponse(httpResponse, method, message);
+            default:
+                this.sendDefaultResponse(httpResponse, method, message);
         }
     };
     ApiGatewaySim.prototype.processHandlerResponse = function (method, httpRequest, httpResponse, lambdaResponse) {
@@ -516,7 +544,7 @@ var ApiGatewaySim = (function () {
             this.sendHttpErrorResponse(httpResponse, lambdaResponse.error);
         }
         else if (lambdaResponse.timeout) {
-            this.sendHttpErrorResponse(httpResponse, "Task timed out after " + this.getLambdaTimeout() + ".00 seconds");
+            this.sendHttpErrorResponse(httpResponse, 'Task timed out after ' + this.getLambdaTimeout() + '.00 seconds');
         }
         else if (lambdaResponse.error) {
             var error = lambdaResponse.error;
@@ -530,7 +558,7 @@ var ApiGatewaySim = (function () {
                 .end();
         }
         else {
-            if (httpRequest.method != 'HEAD') {
+            if (httpRequest.method !== 'HEAD') {
                 this.sendHttpSuccessResponse(httpResponse, method, lambdaResponse.message);
             }
             else {
@@ -550,12 +578,12 @@ var ApiGatewaySim = (function () {
         if (!path) {
             return path;
         }
-        path = path.replace(/{([a-zA-Z0-9]+)}/g, ":$1");
-        path = path.replace(/{([a-zA-Z]+\+)}/g, "*");
+        path = path.replace(/{([a-zA-Z0-9]+)}/g, ':$1');
+        path = path.replace(/{([a-zA-Z]+\+)}/g, '*');
         return path;
     };
     ApiGatewaySim.prototype.getExpressMethod = function (methodName) {
-        if (methodName == methods_1.default.ANY) {
+        if (methodName === methods_1.default.ANY) {
             return 'all';
         }
         return methodName;
@@ -566,17 +594,14 @@ var ApiGatewaySim = (function () {
             contentType = 'application/json';
         }
         var template = this.getRequestTemplate(method, contentType);
-        if (template) {
-            return true;
-        }
-        return false;
+        return !!template;
     };
     ApiGatewaySim.prototype.configureRoutePathMethod = function (path, method) {
         var _this = this;
         var basePath = this.getBasePath();
         var expressPath = this.replacePathParams(basePath + path.pattern);
         var expressMethod = this.getExpressMethod(method.name);
-        this.logInfo("Add Route " + basePath + path.pattern + ", method " + expressMethod.toUpperCase());
+        this.logInfo('Add Route ' + basePath + path.pattern + ', method ' + expressMethod.toUpperCase());
         this._gatewayServer[expressMethod](expressPath, function (req, res) {
             try {
                 _this._currentResponse = res;
@@ -599,13 +624,15 @@ var ApiGatewaySim = (function () {
         });
     };
     ApiGatewaySim.prototype.configureRoutePath = function (path) {
-        for (var index in path.methods) {
-            this.configureRoutePathMethod(path, path.methods[index]);
+        for (var _i = 0, _a = path.methods; _i < _a.length; _i++) {
+            var method = _a[_i];
+            this.configureRoutePathMethod(path, method);
         }
     };
     ApiGatewaySim.prototype.configureRoutes = function () {
-        for (var index in this._openApiConfig.paths) {
-            this.configureRoutePath(this._openApiConfig.paths[index]);
+        for (var _i = 0, _a = this._openApiConfig.paths; _i < _a.length; _i++) {
+            var path_2 = _a[_i];
+            this.configureRoutePath(path_2);
         }
     };
     ApiGatewaySim.prototype.runServer = function () {
@@ -621,7 +648,7 @@ var ApiGatewaySim = (function () {
             if (error) {
                 _this.errorMessage(error);
             }
-            _this.logInfo("Listening to port " + port);
+            _this.logInfo('Listening to port ' + port);
         });
     };
     ApiGatewaySim.prototype.errorMessage = function (message) {
@@ -634,7 +661,7 @@ var ApiGatewaySim = (function () {
             this._packageJson = JSON.parse(packageJson);
         }
         catch (error) {
-            this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
+            this.errorMessage('Missing package.json, Please this inside your lambda application root directory.');
         }
     };
     ApiGatewaySim.prototype.loadLocalPackageJson = function () {
@@ -643,7 +670,7 @@ var ApiGatewaySim = (function () {
             this._localPackageJson = JSON.parse(packageJson);
         }
         catch (error) {
-            this.errorMessage("Missing package.json, Please this inside your lambda application root directory.");
+            this.errorMessage('Missing package.json, Please this inside your lambda application root directory.');
         }
     };
     ApiGatewaySim.prototype.getEventJson = function () {
@@ -657,7 +684,7 @@ var ApiGatewaySim = (function () {
         }
         catch (error) {
             if (commander['event']) {
-                this.errorMessage("Unable to open " + commander['event']);
+                this.errorMessage('Unable to open ' + commander['event']);
             }
             return {};
         }
@@ -673,7 +700,7 @@ var ApiGatewaySim = (function () {
         }
         catch (error) {
             if (commander['context']) {
-                this.errorMessage("Unable to open " + commander['context']);
+                this.errorMessage('Unable to open ' + commander['context']);
             }
             return {};
         }
@@ -689,7 +716,7 @@ var ApiGatewaySim = (function () {
         }
         catch (error) {
             if (commander['stageVariables']) {
-                this.errorMessage("Unable to open " + commander['stageVariables']);
+                this.errorMessage('Unable to open ' + commander['stageVariables']);
             }
             return {};
         }

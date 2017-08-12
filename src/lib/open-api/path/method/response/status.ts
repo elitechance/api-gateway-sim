@@ -3,10 +3,7 @@
  */
 
 export default class Status {
-    private _status:number;
-    private _description:string;
-    private _schema:string;
-    private _headers:Array<string>;
+    private _status: number;
 
     get status(): number {
         return this._status;
@@ -16,6 +13,8 @@ export default class Status {
         this._status = value;
     }
 
+    private _description: string;
+
     get description(): string {
         return this._description;
     }
@@ -24,6 +23,8 @@ export default class Status {
         this._description = value;
     }
 
+    private _schema: string;
+
     get schema(): string {
         return this._schema;
     }
@@ -31,6 +32,8 @@ export default class Status {
     set schema(value: string) {
         this._schema = value;
     }
+
+    private _headers: Array<string>;
 
     get headers(): Array<string> {
         return this._headers;

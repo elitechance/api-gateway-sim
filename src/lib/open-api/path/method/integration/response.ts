@@ -2,13 +2,10 @@
  * Created by EGomez on 3/15/17.
  */
 
-import PathMethodIntegrationResponseParameter from "./response/parameter";
+import PathMethodIntegrationResponseParameter from './response/parameter';
 
 export default class Response {
-    private _pattern:string;
-    private _statusCode:number;
-    private _responseParameters:Array<PathMethodIntegrationResponseParameter> = [];
-    private _baseHeaderName:string = 'method.response.header';
+    private _pattern: string;
 
     get pattern(): string {
         return this._pattern;
@@ -18,6 +15,8 @@ export default class Response {
         this._pattern = value;
     }
 
+    private _statusCode: number;
+
     get statusCode(): number {
         return this._statusCode;
     }
@@ -26,6 +25,8 @@ export default class Response {
         this._statusCode = value;
     }
 
+    private _responseParameters: Array<PathMethodIntegrationResponseParameter> = [];
+
     get responseParameters(): Array<PathMethodIntegrationResponseParameter> {
         return this._responseParameters;
     }
@@ -33,6 +34,8 @@ export default class Response {
     set responseParameters(value: Array<PathMethodIntegrationResponseParameter>) {
         this._responseParameters = value;
     }
+
+    private _baseHeaderName = 'method.response.header';
 
     get baseHeaderName(): string {
         return this._baseHeaderName;
