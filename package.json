@@ -2,12 +2,13 @@
   "name": "api-gateway-sim",
   "version": "1.2.20",
   "description": "AWS API Gateway simulator for Node JS Lambda",
-  "main": "api-gateway-sim.js",
+  "main": "./dist/api-gateway-sim.js",
   "bin": {
-    "ags": "./api-gateway-sim.js"
+    "ags": "./dist/api-gateway-sim.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "sh ./build.sh"
   },
   "repository": {
     "type": "git",

@@ -8,13 +8,10 @@
     "experimentalDecorators": true,
     "lib": [ "es2015", "dom" ],
     "noImplicitAny": true,
-    "rootDir":"src/",
-    "outDir":"./",
+    "rootDir":"./src/",
+    "outDir":"../dist/public",
     "suppressImplicitAnyIndexErrors": true
   },
-  "include":["src/**/*"],
-  "exclude": [
-    "node_modules"
-  ],
-  "files": ["src/main.ts"]
+  "include":["./src/**/*"],
+  "exclude": [ "node_modules"]
 }

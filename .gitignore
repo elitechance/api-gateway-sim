@@ -37,3 +37,10 @@ jspm_packages
 
 # Optional REPL history
 .node_repl_history
+
+dist
+
+public/bootstrap.min.css
+.DS_Store
+.editorconfig
+.vscode

@@ -4,33 +4,10 @@
     "target": "es5",
     "sourceMap": true,
     "rootDir":"src/",
-    "outDir":"./",
+    "outDir":"./dist",
     "moduleResolution": "node",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "exclude": [
-    "node_modules"
-  ],
-  "include":["src/**/*"],
-  "files": [
-    "src/api-gateway-sim.ts",
-    "src/lib/callback.ts",
-    "src/lib/handler.ts",
-    "src/lib/http-status.ts",
-    "src/lib/aws/gateway/body-template.ts",
-    "src/lib/open-api/open-api.ts",
-    "src/lib/open-api/info.ts",
-    "src/lib/open-api/methods.ts",
-    "src/lib/open-api/path.ts",
-    "src/lib/open-api/path/method.ts",
-    "src/lib/open-api/path/method/response.ts",
-    "src/lib/open-api/path/method/integration.ts",
-    "src/lib/open-api/path/method/integration/response.ts",
-    "src/lib/open-api/path/method/integration/response/parameter.ts",
-    "src/lib/open-api/path/method/integration/response/request/template.ts",
-    "src/lib/open-api/path/method/response/status.ts",
-    "src/lib/aws/gateway/util.ts",
-    "src/lib/aws/gateway/input.ts"
-  ]
+  "include":["src/**/*"]
 }
