@@ -1,10 +1,10 @@
 {
   "name": "api-gateway-sim",
-  "version": "1.2.21",
+  "version": "1.2.23",
   "description": "AWS API Gateway simulator for Node JS Lambda",
-  "main": "./dist/api-gateway-sim.js",
+  "main": "./api-gateway-sim.js",
   "bin": {
-    "ags": "./dist/api-gateway-sim.js"
+    "ags": "./api-gateway-sim.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
