@@ -1,5 +1,10 @@
 ## Changelog
 
+1.2.24
+
+* Fix file format
+* Add catch to authorizer request for proxy endpoint
+
 1.2.21
 
 * Fix repositories

@@ -252,7 +252,7 @@ export class BodyMappingParserComponent implements OnInit {
     }
 
     private initEditorOutput() {
-        const options = Object['assign']({readOnly: true}, this.jsonOptions); // merge
+        const options = Object.assign({readOnly: true}, this.jsonOptions); // merge
         this.editorOutput = CodeMirror.fromTextArea(this.elementOutput.nativeElement, options);
     }
 
