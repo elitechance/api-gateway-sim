@@ -1,5 +1,9 @@
 # Changelog
 
+1.2.25
+
+* Fix process.send async issue
+
 1.2.24
 
 * Fix file format

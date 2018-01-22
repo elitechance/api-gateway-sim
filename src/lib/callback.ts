@@ -40,8 +40,9 @@ export default class Callback {
 
   handler(error: Error, message?: any) {
     const response = this.getResponse(error, message);
-    this.process.send(response);
-    this.process.exit(0);
+    this.process.send(response, () => {
+      this.process.exit(0);
+    });
   }
 
   private getResponse(error: Error, message) {
