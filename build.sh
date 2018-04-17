@@ -1,6 +1,6 @@
 #!/bin/sh
 rm -rf dist
-tsc
+./node_modules/.bin/tsc
 cp -a templates dist
-cd public ; tsc ; cp *.css *.js *.json package.json index.html ../dist/public/ ; cd ..
+cd public ; ./node_modules/.bin/tsc ; cp *.css *.js *.json package.json index.html ../dist/public/ ; cd ..
 cp package.json dist/

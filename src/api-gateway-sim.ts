@@ -354,7 +354,17 @@ class ApiGatewaySim {
     return null;
   }
 
+  private getTime() {
+    const date = new Date();
+    const toStringInfo = date.toUTCString().split(/ /);
+    const month = toStringInfo[2];
+    const time = toStringInfo[4];
+    const day = date.getDate();
+    return `${day}/${month}/${date.getFullYear()}:${time} +0000`;
+  }
+
   private setProxyStageVariables(path: Path, event: any, request: Request) {
+    const date = new Date();
     if (!event.requestContext) {
       event.requestContext = {};
     }
@@ -363,7 +373,14 @@ class ApiGatewaySim {
       ''
     );
     event.requestContext.resourcePath = path.pattern;
-    event.requestContext.path = this.getPathInOriginalUrl(request.originalUrl);
+    event.requestContext.path = request.originalUrl.replace(/\?.*/, '');
+    event.requestContext.httpMethod = request.method;
+    event.requestContext.requestId = require('uuid/v4')();
+    event.requestContext.requestTime = this.getTime();
+    event.requestContext.requestTimeEpoch = date.getTime();
+    event.requestContext.protocol = 'HTTP/' + request.httpVersion;
+    event.stageVariables = event['stage-variables'];
+    delete event['stage-variables'];
   }
 
   private getRequestBody(body: any) {
@@ -436,7 +453,7 @@ class ApiGatewaySim {
         request
       );
       requestObject.eventJson.resource = path.pattern;
-      requestObject.eventJson.body = request.body.toString();
+      requestObject.eventJson.body = request.body;
       requestObject.eventJson.path = this.getPathInOriginalUrl(
         request.originalUrl
       );
@@ -753,7 +770,7 @@ class ApiGatewaySim {
     this._gatewayServer[expressMethod](expressPath, (req, res) => {
       try {
         this._currentResponse = res;
-        const childProcess = require('child_process');
+        const childProcess = require('child-process-debug');
         const parent = childProcess.fork(__dirname + '/lib/handler');
         if (this.validRequest(method, req)) {
           this.currentRequest = this.getRequest(path, method, req);

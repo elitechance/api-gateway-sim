@@ -2,13 +2,13 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "es5",
-    "lib": [ "es2015","es2017","dom" ],
+    "lib": ["es2015", "es2017", "dom"],
     "sourceMap": true,
-    "rootDir":"src/",
-    "outDir":"./dist",
+    "rootDir": "./src/",
+    "outDir": "./dist",
     "moduleResolution": "node",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include":["src/**/*"]
+  "exclude": ["./public"]
 }
