@@ -1,6 +1,6 @@
 {
   "name": "api-gateway-sim",
-  "version": "1.2.26",
+  "version": "1.2.27",
   "description": "AWS API Gateway simulator for Node JS Lambda",
   "main": "./api-gateway-sim.js",
   "bin": {
@@ -19,11 +19,7 @@
     "url": "https://github.com/elitechance/api-gateway-sim/issues"
   },
   "homepage": "https://github.com/elitechance/api-gateway-sim#readme",
-  "keywords": [
-    "api gateway",
-    "lambda",
-    "aws"
-  ],
+  "keywords": ["api gateway", "lambda", "aws"],
   "author": "Ethan Dave B. Gomez",
   "license": "MIT",
   "devDependencies": {

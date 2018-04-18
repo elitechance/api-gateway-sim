@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.27
+
+* Add readme and change log in the build
+
 ## 1.2.26
 
 * Fix stage variables for proxy
