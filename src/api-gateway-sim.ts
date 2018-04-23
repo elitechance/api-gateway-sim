@@ -777,6 +777,7 @@ class ApiGatewaySim {
           parent.send(this.currentRequest);
           parent.on('message', message => {
             this.processHandlerResponse(method, req, res, message);
+            parent.disconnect();
           });
         } else {
           this.sendHttpErrorUnsupportedType(res);
