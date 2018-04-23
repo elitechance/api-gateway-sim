@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.28
+
+* Add tslint
+* Disconnect parent process when data from child is already received
+* Support for git flow
+
 ## 1.2.27
 
 * Add readme and change log in the build
