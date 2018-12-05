@@ -592,8 +592,9 @@ class ApiGatewaySim {
 
   private setMessageHeaders(response: Response, message: any) {
     if (message.headers) {
-      for (const header of message.headers) {
-        response.setHeader(header, message.headers[header]);
+      const keys = Object.keys(message.headers);
+      for (const key of keys) {
+        response.setHeader(key, message.headers[key]);
       }
     }
   }
@@ -812,7 +813,7 @@ class ApiGatewaySim {
       if (error) {
         this.errorMessage(error);
       }
-      this.logInfo('Listening to port ' + port);
+      this.logInfo('Listening to port' + port);
     });
   }
 
