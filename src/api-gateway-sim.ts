@@ -563,7 +563,12 @@ class ApiGatewaySim {
   }
 
   private validProxyProperties(message) {
-    const validProperties = { body: true, statusCode: true, headers: true };
+    const validProperties = {
+      body: true,
+      statusCode: true,
+      headers: true,
+      multiValueHeaders: true
+    };
     for (const property in message) {
       if (!validProperties[property]) {
         return false;
@@ -595,6 +600,16 @@ class ApiGatewaySim {
       const keys = Object.keys(message.headers);
       for (const key of keys) {
         response.setHeader(key, message.headers[key]);
+      }
+    }
+    if (message.multiValueHeaders) {
+      const keys = Object.keys(message.multiValueHeaders);
+      for (const key of keys) {
+        const values: string[] = message.multiValueHeaders[key];
+        if (message.headers[key]) {
+          values.push(message.headers[key]);
+        }
+        response.setHeader(key, values);
       }
     }
   }
@@ -813,7 +828,7 @@ class ApiGatewaySim {
       if (error) {
         this.errorMessage(error);
       }
-      this.logInfo('Listening to port' + port);
+      this.logInfo('Listening to port: ' + port);
     });
   }
 

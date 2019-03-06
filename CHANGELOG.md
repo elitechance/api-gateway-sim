@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- Fix escape
+- Support proxy multiValueHeaders
+
 ## 1.2.29
 
 - Fix proxy headers mapping
