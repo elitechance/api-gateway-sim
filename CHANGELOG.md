@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+- Support for proxy request multiValueHeaders
+- Support for proxy request multiValueQueryStringParameters
+- Support for proxy isBase64Encoded
+
 ## 1.3.0
 
 - Fix escape

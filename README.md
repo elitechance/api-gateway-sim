@@ -1,7 +1,9 @@
 # api-gateway-sim
+
 AWS API Gateway simulator for Node JS Lambda
 
 Install
+
 ```bash
 $ npm install -g api-gateway-sim
 ```
@@ -13,6 +15,7 @@ Choose **"Export as Swagger + API Gateway Integrations"**.
 See details in [Export an API from Api Gateway](http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-export-api.html)
 
 Running the simulator using **_ags_** cli
+
 ```bash
 $ cd <node lambda directory>
 $ ags --swagger <exported swagger json file>.json
@@ -20,16 +23,19 @@ $ ags --swagger <exported swagger json file>.json
 ```
 
 Testing your lambda
+
 ```bash
 $ curl http://localhost:3000/
 ```
 
 Using different listening port
+
 ```bash
 $ PORT=4000 ags --swagger <file>.json
 ```
 
 Command Line Help
+
 ```bash
   Usage: ags [options]
 
@@ -49,23 +55,24 @@ Command Line Help
     -g, --ags-port <port>           AGS UI port, default 4000
 ```
 
-Features
----------
+## Features
 
-* Supports Body Mapping Templates
-* Supports Body Mapping Template validation.
+- Supports Body Mapping Templates
+- Supports Body Mapping Template validation.
+
 ```bash
 $ ags -a
 
 # From your browser open http://localhost:4000
 ```
-* Supports integration responses
-* Supports event.json, context.json, and stage-variables.json
-* Continues to monitoring changes in your lambda code.  YES! No need to restart **_ags_**
-* Support for json or yaml swagger file.
-* Monitor changes in event.json, context.json, and stage-variables.json
-* CORS - enabled by default
-* Supports lambda timeout
-* Supports base path
-* Supports {proxy+}
 
+- Supports integration responses
+- Supports event.json, context.json, and stage-variables.json
+- Continues to monitoring changes in your lambda code. YES! No need to restart **_ags_**
+- Support for json or yaml swagger file.
+- Monitor changes in event.json, context.json, and stage-variables.json
+- CORS - enabled by default
+- Supports lambda timeout
+- Supports base path
+- Supports {proxy+}
+- Supports proxy integration isBase64Encoded, multiValueHeaders, and multiValueQueryStringParameters

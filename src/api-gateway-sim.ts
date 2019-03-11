@@ -172,13 +172,6 @@ class ApiGatewaySim {
     console.log(message);
   }
 
-  private getQueryParams(request: Request) {
-    const url = require('url');
-    const url_parts = url.parse(request.url, true);
-    const query = url_parts.query;
-    return query;
-  }
-
   private getPassThroughTemplateContent() {
     const file = __dirname + '/templates/pass-through.vtl';
     return fs.readFileSync(file, 'utf8');
@@ -290,13 +283,37 @@ class ApiGatewaySim {
     }
   }
 
+  private setHeaders(bodyTemplate: BodyTemplate, request: Request) {
+    const keys = Object.keys(request.headers);
+    if (!bodyTemplate.headers) {
+      bodyTemplate.headers = {};
+    }
+    for (const key of keys) {
+      if (Array.isArray(request.headers[key])) {
+        bodyTemplate.headers[key] =
+          request.headers[key][request.headers[key].length - 1];
+        bodyTemplate.multiValueHeaders[key] = request.headers[key];
+      } else {
+        bodyTemplate.headers[key] = request.headers[key];
+        bodyTemplate.multiValueHeaders[key] = [request.headers[key]];
+      }
+    }
+  }
+
+  private setQueryParams(bodyTemplate: BodyTemplate, request: Request) {
+    const url = require('url');
+    const url_parts = url.parse(request.url, true);
+    const query = url_parts.query;
+    bodyTemplate.queryParams = query;
+  }
+
   private parseEvent(method: Method, request: Request) {
     const bodyTemplate = new BodyTemplate();
     bodyTemplate.context = this.getContextJson();
     this.setContextDefaults(bodyTemplate.context, request);
-    bodyTemplate.headers = request.headers;
+    this.setHeaders(bodyTemplate, request);
     bodyTemplate.pathParams = this.getBodyTemplatePathParams(request);
-    bodyTemplate.queryParams = this.getQueryParams(request);
+    this.setQueryParams(bodyTemplate, request);
     bodyTemplate.method = request.method;
     bodyTemplate.payload = this.getBodyTemplatePayload(method, request);
     bodyTemplate.stageVariables = this.getStageVariables();
@@ -434,11 +451,30 @@ class ApiGatewaySim {
     return Object.keys(object).length === 0 && object.constructor === Object;
   }
 
-  private getProxyQueryString(request: Request) {
+  private setProxyQueryString(event: any, request: Request) {
     if (this.isObjectEmpty(request.query)) {
-      return null;
+      event.queryStringParameters = null;
+      event.multiValueQueryStringParameters = null;
+      return;
     }
-    return request.query;
+    if (!event.queryStringParameters) {
+      event.queryStringParameters = {};
+    }
+    if (!event.multiValueQueryStringParameters) {
+      event.multiValueQueryStringParameters = {};
+    }
+    const keys = Object.keys(request.query);
+    const queries = request.query;
+    for (const key of keys) {
+      if (Array.isArray(queries[key])) {
+        event.queryStringParameters[key] =
+          queries[key][queries[key].length - 1];
+        event.multiValueQueryStringParameters[key] = queries[key];
+      } else {
+        event.queryStringParameters[key] = queries[key];
+        event.multiValueQueryStringParameters[key] = [queries[key]];
+      }
+    }
   }
 
   private processProxyData(
@@ -458,9 +494,7 @@ class ApiGatewaySim {
         request.originalUrl
       );
       requestObject.eventJson.headers = this.getRawHeaders(request);
-      requestObject.eventJson.queryStringParameters = this.getProxyQueryString(
-        request
-      );
+      this.setProxyQueryString(requestObject.eventJson, request);
       requestObject.eventJson.httpMethod = request.method;
       this.removeNonProxyFields(requestObject.eventJson);
       this.setProxyStageVariables(path, requestObject.eventJson, request);
@@ -567,6 +601,7 @@ class ApiGatewaySim {
       body: true,
       statusCode: true,
       headers: true,
+      isBase64Encoded: true,
       multiValueHeaders: true
     };
     for (const property in message) {
@@ -614,6 +649,16 @@ class ApiGatewaySim {
     }
   }
 
+  private setBase64Encoded(method: Method, message: any) {
+    if (
+      method.integration &&
+      method.integration.contentHandling === 'CONVERT_TO_BINARY'
+    ) {
+      return Buffer.from(message.body, 'base64');
+    }
+    return message.body;
+  }
+
   private sendAwsProxyResponse(
     httpResponse: Response,
     method: Method,
@@ -640,6 +685,9 @@ class ApiGatewaySim {
       } else {
         this.setMessageStatusCode(httpResponse, message);
         this.setMessageHeaders(httpResponse, message);
+        if (message.isBase64Encoded) {
+          parseBody = this.setBase64Encoded(method, message);
+        }
         this.sendDefaultResponse(httpResponse, method, parseBody);
       }
     } catch (error) {
